@@ -1,0 +1,42 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - dev/feature/fish-design
+      - main
+  workflow_dispatch: {}
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: my-app
+
+      - name: Build
+        run: npm run build
+        working-directory: my-app
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: my-app/dist
+          destination_dir: yui_moartplanner_2026_1.1
+          clean: true
+          token: ${{ secrets.GITHUB_TOKEN }}
