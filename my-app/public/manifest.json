@@ -1,34 +1,23 @@
 {
   "name": "Mo Art Planner",
   "short_name": "MoArt",
-  "start_url": "/yui_moartplanner_2026_01/yui_moartplanner_2026_1.1/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0c4a6e",
   "icons": [
     {
-      "src": "/yui_moartplanner_2026_01/yui_moartplanner_2026_1.1/icon1.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/yui_moartplanner_2026_01/yui_moartplanner_2026_1.1/icon1.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-    ,
-    {
-      "src": "/yui_moartplanner_2026_01/icon1.png",
+      "src": "icon1.png",
       "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "/yui_moartplanner_2026_01/icon1.png",
+      "src": "icon1.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/yui_moartplanner_2026_01/icon1.png",
+      "src": "icon1.png",
       "sizes": "512x512",
       "type": "image/png"
     }
