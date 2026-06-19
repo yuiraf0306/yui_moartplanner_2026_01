@@ -901,26 +901,65 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   };
 
 
-  const callGeminiAI = async (userText) => {
+    const callGeminiAI = async (userText) => {
       const cleanHistory = chatMessages.filter(m => !m.text.includes("通訊失敗") && !m.text.includes("權限不足") && m.id !== 'init');
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta2/models/${MODEL_NAME}:generateText?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/${MODEL_VERSION}/models/${MODEL_NAME}:generateContent?key=${apiKey}`
+      ];
+      let lastError = null;
       try {
-          const API_URL = `https://generativelanguage.googleapis.com/${MODEL_VERSION}/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-          const payload = {
-              system_instruction: { parts: [{ text: RAFAYEL_SYSTEM_PROMPT }] },
-              contents: [...cleanHistory.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: "user", parts: [{ text: userText }] }]
-          };
-          const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-          if (!response.ok) throw new Error(`Google 拒絕連線 (${response.status})`);
-          const data = await response.json();
-          if (data.candidates && data.candidates.length > 0) {
-              let aiText = data.candidates[0].content.parts[0].text;
+        for (const API_URL of endpoints) {
+          try {
+            let body = {};
+            if (API_URL.includes('generateText')) {
+              body = { prompt: { text: RAFAYEL_SYSTEM_PROMPT + "\n" + cleanHistory.map(m=>`${m.sender}: ${m.text}`).join('\n') + "\nuser: " + userText }, temperature: 0.2 };
+            } else {
+              body = {
+                system_instruction: { parts: [{ text: RAFAYEL_SYSTEM_PROMPT }] },
+                contents: [...cleanHistory.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: "user", parts: [{ text: userText }] }]
+              };
+            }
+            const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!response.ok) {
+              const txt = await response.text().catch(()=>'');
+              lastError = `Google 回傳 ${response.status} ${response.statusText} ${txt}`;
+              // try next endpoint
+              continue;
+            }
+            const data = await response.json();
+            // handle different response shapes
+            let aiText = null;
+            if (data?.candidates && data.candidates.length > 0) {
+              aiText = data.candidates[0].content.parts[0].text;
+            } else if (data?.output && Array.isArray(data.output) && data.output[0]?.content) {
+              aiText = data.output.map(o => o.content.map(c=>c.text || '').join('')).join('\n');
+            } else if (data?.candidates?.length === 0 && data?.message) {
+              aiText = data.message.content?.[0]?.text || null;
+            } else if (data?.result?.content) {
+              aiText = data.result?.content?.[0]?.text || null;
+            }
+            if (aiText) {
               aiText = aiText.replace(/\*+/g, '');
               setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: aiText }]);
+              lastError = null;
+              break;
+            } else {
+              lastError = 'Google 回傳資料格式不支援';
+            }
+          } catch (err) {
+            lastError = err.message || String(err);
+            continue;
           }
+        }
+        if (lastError) {
+          // provide helpful guidance and fallback
+          setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${lastError}) 建議：確認 API key 是否正確、已啟用 Generative Language API、或改用伺服器端代理。` }]);
+        }
       } catch (error) {
-          setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${error.message})` }]);
+        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${error.message})` }]);
       } finally { setIsAiTyping(false); }
-  };
+    };
 
 
   const handleChatSend = () => {
