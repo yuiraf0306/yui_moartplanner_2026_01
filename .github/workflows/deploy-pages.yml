@@ -30,15 +30,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Prepare artifact in subfolder
-        run: |
-          mkdir -p out/yui_moartplanner_2026_1.1
-          cp -a dist/. out/yui_moartplanner_2026_1.1/
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v1
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: out
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+          branch: gh-pages
+          folder: dist
+          destination_dir: yui_moartplanner_2026_1.1
+          clean: true
+          token: ${{ secrets.GITHUB_TOKEN }}
