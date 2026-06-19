@@ -4,17 +4,33 @@
 
 /* Ensure no white gaps on scroll and consistent background */
 html, body, #root {
-	height: 100%;
+	height: 100vh;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	background: linear-gradient(to bottom right, #240078, #C4529E);
+	background-attachment: fixed;
 }
 
 body {
-	@apply m-0 min-h-screen bg-slate-50 text-slate-900 antialiased;
+	@apply m-0 min-h-screen text-slate-900 antialiased;
+	background: transparent;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
-	overflow-y: overlay;
+	overflow: hidden;
+}
+
+#root {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: transparent;
 }
 
 /* prevent horizontal scroll white gaps */
 body, #root {
 	overflow-x: hidden;
+	overflow-y: hidden;
 }

@@ -1320,7 +1320,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
 
         {/* Chat Window */}
         {isChatOpen && appFrame && createPortal(
-          <div className="absolute inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
              <div className="flex-1 w-full max-w-md mx-auto bg-[#0f172a] h-full shadow-2xl flex flex-col relative overflow-hidden font-sans">
                 {/* Header */}
                 <div className="px-4 py-4 bg-[#1e1b4b]/90 backdrop-blur-md border-b border-purple-900/50 flex items-center justify-between z-10 shrink-0">
@@ -1666,7 +1666,7 @@ export default function App() {
 
 
   return (
-    <div id="rafayel-app-frame" className="w-full h-screen bg-gradient-to-br from-[#240078] to-[#C4529E] flex justify-center items-center font-sans overflow-hidden text-slate-200 selection:bg-purple-500/30 relative">
+    <div id="rafayel-app-frame" className="w-screen h-screen bg-gradient-to-br from-[#240078] to-[#C4529E] flex justify-center items-center font-sans overflow-hidden text-slate-200 selection:bg-purple-500/30 relative fixed inset-0">
       <style>{`
         @import url('https://cdn.jsdelivr.net/gh/justfont/open-huninn-font@master/font/jf-openhuninn.css');
 
