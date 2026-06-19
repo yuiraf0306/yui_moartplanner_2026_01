@@ -1642,12 +1642,18 @@ export default function App() {
 
     const initAuth = async () => {
       try {
+        console.log("🔥 Firebase Init: projectId =", firebaseConfig.projectId, "authDomain =", firebaseConfig.authDomain);
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
+          console.log("✅ Firebase Auth: Custom token sign-in successful");
         } else {
           await signInAnonymously(auth);
+          console.log("✅ Firebase Auth: Anonymous sign-in successful");
         }
-      } catch (err) { console.error("Auth Fail:", err); }
+      } catch (err) { 
+        console.error("❌ Firebase Auth Error:", err?.message || err);
+        console.error("❌ Full error:", err);
+      }
     };
     initAuth();
     
