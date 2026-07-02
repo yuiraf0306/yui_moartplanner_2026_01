@@ -7,7 +7,9 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  signOut
+  signOut,
+  setPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -66,9 +68,19 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'moartplanner202601';
 
-// Firebase 安全性調整
-auth.settings = auth.settings || {};
-auth.settings.appVerificationDisabledForTesting = false;
+// ⚠️ 重要：禁用匿名用戶升級，防止 admin-restricted-operation 錯誤
+// 這個錯誤會在 Firebase 禁用匿名登入時發生
+try {
+  setPersistence(auth, browserSessionPersistence)
+    .then(() => {
+      console.log("✅ Firebase 持久化已設置為 SESSION");
+    })
+    .catch((error) => {
+      console.error("⚠️ 持久化設置失敗 (不影響登入):", error?.code);
+    });
+} catch (err) {
+  console.log("⚠️ 持久化不可用 (某些環境下正常)");
+}
 
 
 // ==========================================
@@ -1738,28 +1750,38 @@ export default function App() {
    useEffect(() => {
     setAppFrame(document.getElementById('rafayel-app-frame'));
     
-    // 監聽認證狀態變化
-    try {
-      const unsubscribe = onAuthStateChanged(auth, (currUser) => {
-        if (currUser) {
-          console.log("✅ 用戶已登入:", currUser.email);
-          setUser(currUser);
-        } else {
-          console.log("❌ 用戶未登入");
-          setUser(null);
-        }
+    // 在建立監聽前確保持久化設置完成
+    const setupAuthListener = async () => {
+      try {
+        // 先設置持久化級別，防止匿名升級
+        await setPersistence(auth, browserSessionPersistence);
+        
+        // 然後建立認證監聽
+        const unsubscribe = onAuthStateChanged(auth, (currUser) => {
+          if (currUser) {
+            console.log("✅ 用戶已登入:", currUser.email);
+            setUser(currUser);
+          } else {
+            console.log("ℹ️ 用戶未登入 (正常狀態)");
+            setUser(null);
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("❌ Firebase Auth State Error:", error);
+          console.error("❌ 錯誤代碼:", error?.code);
+          console.error("❌ 錯誤訊息:", error?.message);
+          setLoading(false);
+        });
+        
+        return () => unsubscribe();
+      } catch (err) {
+        console.error("❌ 認證初始化失敗:", err);
         setLoading(false);
-      }, (error) => {
-        console.error("❌ Firebase Auth State Error:", error);
-        console.error("❌ 錯誤代碼:", error?.code);
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    } catch (err) {
-      console.error("❌ 認證監聽設置失敗:", err);
-      setLoading(false);
-    }
-}, []);
+      }
+    };
+    
+    setupAuthListener();
+  }, []);
 
   return (
     <div id="rafayel-app-frame" className="w-screen h-screen bg-[#0f0a20] flex justify-center items-center font-sans overflow-hidden text-slate-200 selection:bg-purple-500/30 relative fixed inset-0">
