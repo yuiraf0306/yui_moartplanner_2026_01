@@ -58,10 +58,17 @@ const firebaseConfig = {
   appId: "1:221209009556:web:fd945c95a6bf0799e68381",
   measurementId: "G-P9VFT07B2P"
 };
+
+console.log("🔥 Firebase Init: projectId =", firebaseConfig.projectId, "authDomain =", firebaseConfig.authDomain);
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'moartplanner202601';
+
+// Firebase 安全性調整
+auth.settings = auth.settings || {};
+auth.settings.appVerificationDisabledForTesting = false;
 
 
 // ==========================================
@@ -1684,38 +1691,74 @@ export default function App() {
   // 1. Google 登入函數
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    // 設置 scopes 確保獲得必要的權限
+    provider.addScope('profile');
+    provider.addScope('email');
+    // 添加自定義參數
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
     try {
-      await signInWithPopup(auth, provider);
-      console.log("✅ Google 登入成功");
+      console.log("🔐 開始 Google 登入...");
+      const result = await signInWithPopup(auth, provider);
+      console.log("✅ Google 登入成功:", result.user.email);
+      setUser(result.user);
     } catch (err) {
       console.error("❌ Google 登入失敗:", err);
+      console.error("❌ 錯誤代碼:", err.code);
+      console.error("❌ 完整錯誤:", err.message);
+      
+      // 根據不同的錯誤提供提示
+      if (err.code === 'auth/admin-restricted-operation') {
+        console.error("⚠️ 錯誤原因: Firebase API 密鑰被限制或 Firebase 項目認證方式未正確配置");
+        console.error("📝 建議: 檢查 Firebase Console 中的 API 密鑰設置");
+      } else if (err.code === 'auth/popup-blocked') {
+        alert('登入窗口被阻止，請允許彈窗');
+      } else if (err.code === 'auth/network-request-failed') {
+        alert('網路連接失敗，請檢查網路設定');
+      }
     }
   };
 
   // 2. Google 登出函數
   const handleLogout = async () => {
     try {
+      console.log("🚪 開始登出...");
       await signOut(auth);
       setUser(null);
       console.log("✅ 登出成功");
     } catch (err) {
       console.error("❌ 登出失敗:", err);
+      console.error("❌ 錯誤代碼:", err.code);
+      alert('登出失敗: ' + err.message);
     }
   };
 
    useEffect(() => {
     setAppFrame(document.getElementById('rafayel-app-frame'));
     
-    // 只監聽狀態變化，如果沒有登入，就不要強迫去做匿名登入
-    const unsubscribe = onAuthStateChanged(auth, (currUser) => {
-      if (currUser) {
-         setUser(currUser);
-      } else {
-         setUser(null); // 這會讓畫面自動跳轉到你寫好的「進入工作室」登入按鈕
-      }
+    // 監聽認證狀態變化
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (currUser) => {
+        if (currUser) {
+          console.log("✅ 用戶已登入:", currUser.email);
+          setUser(currUser);
+        } else {
+          console.log("❌ 用戶未登入");
+          setUser(null);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.error("❌ Firebase Auth State Error:", error);
+        console.error("❌ 錯誤代碼:", error?.code);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("❌ 認證監聽設置失敗:", err);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    }
 }, []);
 
   return (
