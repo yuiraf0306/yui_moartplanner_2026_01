@@ -7,9 +7,7 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  signOut,
-  setPersistence,
-  browserSessionPersistence
+  signOut
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -68,19 +66,9 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'moartplanner202601';
 
-// ⚠️ 重要：禁用匿名用戶升級，防止 admin-restricted-operation 錯誤
-// 這個錯誤會在 Firebase 禁用匿名登入時發生
-try {
-  setPersistence(auth, browserSessionPersistence)
-    .then(() => {
-      console.log("✅ Firebase 持久化已設置為 SESSION");
-    })
-    .catch((error) => {
-      console.error("⚠️ 持久化設置失敗 (不影響登入):", error?.code);
-    });
-} catch (err) {
-  console.log("⚠️ 持久化不可用 (某些環境下正常)");
-}
+// ⚠️ 禁用 setPersistence，因為它會觸發 signUp 請求導致 auth/admin-restricted-operation 錯誤
+// Firebase SDK 在禁用匿名登入的項目中，setPersistence 會嘗試升級匿名用戶而失敗
+console.log("✅ Firebase 已初始化 (不設置 persistence 以避免錯誤)");
 
 
 // ==========================================
@@ -1750,37 +1738,46 @@ export default function App() {
    useEffect(() => {
     setAppFrame(document.getElementById('rafayel-app-frame'));
     
-    // 在建立監聽前確保持久化設置完成
-    const setupAuthListener = async () => {
+    // 簡化認證監聽設置，完全避免可能導致 signUp 請求的操作
+    const setupAuthListener = () => {
       try {
-        // 先設置持久化級別，防止匿名升級
-        await setPersistence(auth, browserSessionPersistence);
-        
-        // 然後建立認證監聽
-        const unsubscribe = onAuthStateChanged(auth, (currUser) => {
-          if (currUser) {
-            console.log("✅ 用戶已登入:", currUser.email);
-            setUser(currUser);
-          } else {
-            console.log("ℹ️ 用戶未登入 (正常狀態)");
-            setUser(null);
+        // 直接設置 onAuthStateChanged，不做任何其他操作
+        const unsubscribe = onAuthStateChanged(
+          auth,
+          (currUser) => {
+            // 成功回調
+            try {
+              if (currUser) {
+                console.log("✅ 用戶已登入:", currUser.email);
+                setUser(currUser);
+              } else {
+                console.log("ℹ️ 用戶未登入，顯示登入畫面");
+                setUser(null);
+              }
+            } finally {
+              // 一定要執行，防止應用卡住
+              setLoading(false);
+            }
+          },
+          (error) => {
+            // 錯誤回調
+            console.error("❌ Firebase Auth State 監聽器錯誤:", error?.code, error?.message);
+            // 即使出錯也要關閉 loading，這樣使用者能看到登入按鈕
+            setLoading(false);
           }
-          setLoading(false);
-        }, (error) => {
-          console.error("❌ Firebase Auth State Error:", error);
-          console.error("❌ 錯誤代碼:", error?.code);
-          console.error("❌ 錯誤訊息:", error?.message);
-          setLoading(false);
-        });
+        );
         
-        return () => unsubscribe();
+        return unsubscribe;
       } catch (err) {
-        console.error("❌ 認證初始化失敗:", err);
+        console.error("❌ 設置認證監聽器失敗:", err);
+        // 重要：保證即使初始化失敗也能顯示登入界面
         setLoading(false);
+        return () => {};
       }
     };
     
-    setupAuthListener();
+    const unsubscribe = setupAuthListener();
+    return () => unsubscribe();
   }, []);
 
   return (
