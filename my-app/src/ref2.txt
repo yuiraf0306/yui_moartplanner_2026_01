@@ -1,13 +1,11 @@
-// @ts-nocheck
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
+  signInAnonymously,
   onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut
+  signInWithCustomToken
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -45,29 +43,22 @@ import {
   ExternalLink,
   Layout,
   Send,
-  Settings
+  Settings,
+  Lock,
+  Unlock,
+  Crop,
+  Check
 } from 'lucide-react';
 
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCGL6UcwjLKTKWLGgTZMjnOlJrOF09_WOA",
-  authDomain: "moartplanner202601.firebaseapp.com",
-  projectId: "moartplanner202601",
-  storageBucket: "moartplanner202601.firebasestorage.app",
-  messagingSenderId: "221209009556",
-  appId: "1:221209009556:web:fd945c95a6bf0799e68381",
-  measurementId: "G-P9VFT07B2P"
-};
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'moartplanner202601';
-
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // ==========================================
 // 共用組件與樣式 (Shared Assets)
 // ==========================================
-
 
 const AlertTriangleIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -77,14 +68,12 @@ const AlertTriangleIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-
 const EditIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
-
 
 const KeyIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -93,7 +82,6 @@ const KeyIcon = ({ size = 12, className = "" }) => (
     <path d="m15.5 7.5 3 3L22 7l-3-3" />
   </svg>
 );
-
 
 const ListTodoIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -105,14 +93,12 @@ const ListTodoIcon = ({ size = 12, className = "" }) => (
   </svg>
 );
 
-
 const CheckCircleIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
     <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
-
 
 const BrushIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -122,7 +108,6 @@ const BrushIcon = ({ size = 12, className = "" }) => (
   </svg>
 );
 
-
 const FishIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
     <path d="M7 12 C 7 7.5 10.5 4 15 4 C 19.5 4 23 7.5 23 12 C 23 16.5 19.5 20 15 20 C 10.5 20 7 16.5 7 12 Z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -130,7 +115,6 @@ const FishIcon = ({ size = 12, className = "" }) => (
     <circle cx="17" cy="10" r="1.5" fill="currentColor" />
   </svg>
 );
-
 
 const ScallopIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -144,7 +128,6 @@ const ScallopIcon = ({ size = 12, className = "" }) => (
     <path d="M18 14C18 12 17.5 10.5 16.5 9.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
   </svg>
 );
-
 
 const CrownIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -160,7 +143,6 @@ const CrownIcon = ({ size = 12, className = "" }) => (
   </svg>
 );
 
-
 const ShellIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
     <path d="M12 21C14.5 21 17 20 18.5 18C20.5 15.5 20.5 12 18.5 9.5C16.5 7 13.5 6 11 6.5C9 7 7.5 8.5 7 10.5C6.5 12.5 7.5 14.5 9 15.5C10.5 16.5 12.5 16 13.5 14.5C14.2 13.5 14 12 13 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -169,7 +151,6 @@ const ShellIcon = ({ size = 12, className = "" }) => (
     <path d="M9 20L9.5 17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
-
 
 const ArrowUpDownIcon = ({ size = 12, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -180,7 +161,6 @@ const ArrowUpDownIcon = ({ size = 12, className = "" }) => (
   </svg>
 );
 
-
 const FireworksDisplay = () => {
   const particles = Array.from({ length: 8 }).map((_, i) => ({
     id: i,
@@ -190,7 +170,6 @@ const FireworksDisplay = () => {
     delay: Math.random() * 1.5 + 's',
     scale: Math.random() * 0.5 + 0.8
   }));
-
 
   return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
@@ -217,10 +196,17 @@ const FireworksDisplay = () => {
   );
 };
 
+// ==========================================
+// 全域常數與輔助函式 (Global Helpers)
+// ==========================================
+const EMOJI_LIST = ['🎨', '🌺', '🍷', '😊', '🥰', '😌', '😎', '😤', '😭', '🤯', '✨', '🧡', '☕', '🔥'];
 
-// ==========================================
-// 共用邏輯：週更重置計算
-// ==========================================
+const PERIODS = [
+  { id: 'morning', label: 'Morning', sub: '清晨', icon: <Droplets className="w-3 h-3" />, color: 'bg-blue-500/20 text-blue-200 border-blue-500/30', defaultStart: '09:00', defaultEnd: '10:00' },
+  { id: 'afternoon', label: 'Afternoon', sub: '午後', icon: <Flame className="w-3 h-3" />, color: 'bg-red-500/20 text-red-200 border-red-500/30', defaultStart: '13:00', defaultEnd: '14:00' },
+  { id: 'evening', label: 'Evening', sub: '夜晚', icon: <Clock className="w-3 h-3" />, color: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/30', defaultStart: '19:00', defaultEnd: '20:00' }
+];
+
 const getWeekResetReference = (dateObj) => {
   const d = new Date(dateObj);
   d.setHours(d.getHours() - 23);
@@ -230,7 +216,6 @@ const getWeekResetReference = (dateObj) => {
   d.setHours(0, 0, 0, 0);
   return d; 
 };
-
 
 const calculateDateForWeekday = (weekdayId, referenceSunday) => {
     let targetDay = parseInt(weekdayId, 10);
@@ -243,24 +228,665 @@ const calculateDateForWeekday = (weekdayId, referenceSunday) => {
     return `${year}-${month}-${day}`;
 };
 
+const formatDateKey = (date) => { if (!date) return ""; return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; };
+const compareTime = (a, b) => (a.start || "").localeCompare(b.start || "");
 
-const EMOJI_LIST = ['🎨', '🌺', '🍷', '🐬', '🐚', '🐋', '💜', '🐟', '😭', '🤯', '✨', '🎉', '☕', '🔥'];
+// 圖片壓縮輔助函數
+const compressImage = (file, maxSize = 300) => new Promise((resolve) => { 
+  const reader = new FileReader(); reader.readAsDataURL(file); 
+  reader.onload = (e) => { 
+    const img = new Image(); img.src = e.target.result; 
+    img.onload = () => { 
+      const canvas = document.createElement('canvas'); 
+      const ctx = canvas.getContext('2d'); 
+      if (maxSize === 300) { 
+        canvas.width = maxSize; canvas.height = maxSize; 
+        const m = Math.min(img.width, img.height); 
+        ctx.drawImage(img, (img.width-m)/2, (img.height-m)/2, m, m, 0, 0, maxSize, maxSize); 
+      } else { 
+        let w = img.width; let h = img.height; 
+        if (w > h && w > maxSize) { h *= maxSize / w; w = maxSize; } 
+        else if (h > w && h > maxSize) { w *= maxSize / h; h = maxSize; } 
+        canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); 
+      } 
+      resolve(canvas.toDataURL('image/jpeg', 0.8)); 
+    } 
+  } 
+});
 
+// 防抖函式，用於減少儲存頻率
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 
 // ==========================================
-// 1. 左側應用：行事曆 (PLANNER)
+// Planner 外部提取元件 (Modals & Views)
+// ==========================================
+
+const PlannerEditModal = ({ editingTask, setEditingTask, handleUpdateTask }) => {
+  if (!editingTask) return null;
+  const [t, setT] = useState('');
+  const [s, setS] = useState('');
+  const [e, setE] = useState('');
+  const [p, setP] = useState('');
+
+  useEffect(() => {
+    if (editingTask) {
+      setT(editingTask.task.title);
+      setS(editingTask.task.start);
+      setE(editingTask.task.end);
+      setP(editingTask.task.period);
+    }
+  }, [editingTask]);
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-sm bg-[#1e1b4b] border border-purple-500/50 rounded-2xl p-6 shadow-2xl relative">
+        <h3 className="text-xl font-black text-white mb-6 flex gap-2"><Palette size={20}/> 編輯計畫</h3>
+        <div className="space-y-4">
+          <input value={t} onChange={e=>setT(e.target.value)} className="w-full bg-black/30 border border-purple-500/30 rounded-xl px-4 py-3 text-white font-bold"/>
+          <div className="flex gap-3">
+            <input type="time" value={s} onChange={ev=>setS(ev.target.value)} className="flex-1 bg-black/30 border border-purple-500/30 rounded-xl px-3 py-3 text-white font-mono"/>
+            <input type="time" value={e} onChange={ev=>setE(ev.target.value)} className="flex-1 bg-black/30 border border-purple-500/30 rounded-xl px-3 py-3 text-white font-mono"/>
+          </div>
+          <div className="flex gap-2">
+            {PERIODS.map(per=>
+              <button key={per.id} onClick={()=>setP(per.id)} className={`flex-1 py-2 rounded-lg text-xs font-black border ${p===per.id?'bg-purple-600 border-purple-400 text-white':'bg-transparent border-white/10 text-slate-400'}`}>
+                {per.label}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-3 mt-8">
+          <button onClick={()=>setEditingTask(null)} className="flex-1 py-3 bg-slate-800 rounded-xl text-slate-400 font-bold">取消</button>
+          <button onClick={()=>handleUpdateTask(editingTask.task.id, {title:t, start:s, end:e, period:p})} className="flex-1 py-3 bg-purple-600 rounded-xl text-white font-bold">保存</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PlannerDeleteModal = ({ deletingTask, setDeletingTask, handleDeleteTask }) => {
+  if(!deletingTask) return null;
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-xs bg-[#0f0a20] border border-red-900/50 rounded-2xl p-6 text-center">
+        <h3 className="text-lg font-black text-white mb-2">確認刪除?</h3>
+        <div className="flex gap-3 mt-6">
+          <button onClick={()=>setDeletingTask(null)} className="flex-1 py-3 bg-slate-800 rounded-xl text-slate-400 font-bold text-xs">取消</button>
+          <button onClick={()=>handleDeleteTask(deletingTask.taskId)} className="flex-1 py-3 bg-red-900/40 text-red-400 border border-red-900/50 rounded-xl font-bold text-xs">確認刪除</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PlannerMoodModal = ({ moodModalData, setMoodModalData, handleSaveMood, exportMoodsToCSV, appFrame }) => {
+  if(!moodModalData) return null;
+  const [text, setText] = useState('');
+  const [emoji, setEmoji] = useState(EMOJI_LIST[0]);
+  const [photosConfig, setPhotosConfig] = useState([]);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
+  const photoInputRef = useRef(null);
+  const MAX_PHOTOS = 6;
+
+  useEffect(() => {
+    if (moodModalData) {
+      setText(moodModalData.text || '');
+      setEmoji(moodModalData.emoji || EMOJI_LIST[0]);
+      setPhotosConfig(moodModalData.photosConfig || []);
+    }
+  }, [moodModalData]);
+
+  const formattedDate = moodModalData.dateObj ? `${moodModalData.dateObj.getMonth() + 1}/${moodModalData.dateObj.getDate()}` : '';
+
+  const handlePhotoChange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      const availableSlots = MAX_PHOTOS - photosConfig.length;
+      if (availableSlots <= 0) return;
+      const filesToProcess = files.slice(0, availableSlots);
+      const newBase64s = await Promise.all(filesToProcess.map(f => compressImage(f, 800)));
+      
+      const newConfigs = newBase64s.map((url, index) => ({
+         url,
+         x: 40 + (photosConfig.length + index) * 20,
+         y: 40 + (photosConfig.length + index) * 20,
+         scale: 1,
+         panX: 0,
+         panY: 0,
+         cropScale: 1
+      }));
+      
+      setPhotosConfig(prev => [...prev, ...newConfigs]);
+      if(photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  const renderModal = () => (
+      <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200 font-sans">
+          {previewPhoto && (
+              <div className="fixed inset-0 z-[310] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setPreviewPhoto(null)}>
+                  <img src={previewPhoto} className="max-w-full max-h-full rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200" alt="Preview" />
+                  <button className="absolute top-6 right-6 text-white/50 hover:text-white p-2 bg-black/50 rounded-full transition-colors" onClick={() => setPreviewPhoto(null)}>
+                      <X size={24} />
+                  </button>
+              </div>
+          )}
+
+          <div className="w-full max-w-sm max-h-[90vh] bg-[#1e1b4b] border border-purple-500/50 rounded-3xl p-6 shadow-2xl relative flex flex-col">
+              <div className="absolute top-0 right-0 p-4 opacity-10 text-purple-300 pointer-events-none rotate-12"><ShellIcon size={80}/></div>
+              <div className="flex justify-between items-center mb-4 relative z-10 flex-nowrap shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
+                      <h3 className="text-xl font-black text-white flex gap-1.5 items-center whitespace-nowrap">
+                          <Palette size={20} className="text-purple-400 shrink-0"/> 
+                          <span className="whitespace-nowrap">心情小語</span>
+                      </h3>
+                      <button onClick={exportMoodsToCSV} className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-purple-300 transition-colors shadow-sm shrink-0" title="匯出日記">
+                          <Download size={14}/>
+                      </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-purple-300/60 uppercase tracking-widest shrink-0 whitespace-nowrap">{formattedDate}</span>
+                      <button onClick={() => photoInputRef.current?.click()} className={`p-1.5 rounded-lg transition-colors shadow-sm shrink-0 ${photosConfig.length >= MAX_PHOTOS ? 'bg-white/5 text-purple-300/30 cursor-not-allowed' : 'bg-white/10 hover:bg-white/20 text-purple-300'}`} title={`上傳照片 (最多${MAX_PHOTOS}張)`} disabled={photosConfig.length >= MAX_PHOTOS}>
+                          <Camera size={14}/>
+                      </button>
+                      <input type="file" ref={photoInputRef} className="hidden" accept="image/*" multiple onChange={handlePhotoChange} />
+                  </div>
+              </div>
+              
+              <div className="relative z-10 flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto custom-scrollbar">
+                  <div className="bg-black/40 rounded-2xl p-4 border border-white/5 shrink-0">
+                      <p className="text-[10px] text-white/40 font-bold uppercase mb-3 text-center">Select your mood</p>
+                      <div className="flex flex-wrap gap-2 justify-center items-center">
+                          {EMOJI_LIST.map(em => (
+                              <button key={em} onClick={() => setEmoji(em)} className={`w-10 h-10 rounded-full text-xl flex items-center justify-center transition-all ${emoji === em ? 'bg-purple-600/50 border border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-transparent border border-transparent hover:bg-white/10'}`}>
+                                  {em}
+                              </button>
+                          ))}
+                          <div className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${!EMOJI_LIST.includes(emoji) && emoji ? 'bg-purple-600/50 border border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-black/40 border border-white/10 hover:bg-white/10'}`}>
+                              <input 
+                                  type="text" 
+                                  maxLength="5"
+                                  className="w-full h-full bg-transparent text-center text-xl focus:outline-none placeholder:text-white/30 pb-0.5"
+                                  placeholder="+"
+                                  value={!EMOJI_LIST.includes(emoji) ? emoji : ''}
+                                  onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val) setEmoji(val);
+                                      else setEmoji(EMOJI_LIST[0]);
+                                  }}
+                              />
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="relative flex-1 flex flex-col min-h-[150px]">
+                      <textarea 
+                          value={text} 
+                          onChange={e => setText(e.target.value)}
+                          placeholder="今天發生了什麼事呢..."
+                          rows={4}
+                          className="w-full flex-1 bg-black/40 border border-purple-500/30 rounded-2xl p-4 text-white font-medium resize-none focus:outline-none focus:border-purple-400 transition-colors placeholder:text-white/20 custom-scrollbar"
+                      />
+                  </div>
+                  
+                  {photosConfig.length > 0 && (
+                      <div className="flex gap-2 pb-1 shrink-0 overflow-x-auto custom-scrollbar">
+                          {photosConfig.map((p, idx) => (
+                              <div key={idx} className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-purple-500/30 group">
+                                  <img src={p.url} alt="upload" className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPreviewPhoto(p.url)} />
+                                  <button onClick={() => setPhotosConfig(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-red-500/80 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                                      <X size={12} />
+                                  </button>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+
+              <div className="flex gap-3 mt-6 relative z-10 shrink-0">
+                  <button onClick={()=>setMoodModalData(null)} className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold transition-colors">取消</button>
+                  <button onClick={()=>handleSaveMood(moodModalData.dateKey, text, emoji, photosConfig)} className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-white font-black shadow-lg shadow-purple-900/50 transition-all flex justify-center items-center gap-2">儲存 <CheckCircleIcon size={16}/></button>
+              </div>
+          </div>
+      </div>
+  );
+  
+  return appFrame ? createPortal(renderModal(), appFrame) : renderModal();
+};
+
+// ==========================================
+// Scrapbook Photo Component
+// ==========================================
+const ScrapbookPhoto = ({ photo, index, isLocked, onUpdatePhoto, onPreview, containerRef }) => {
+  const [localTransform, setLocalTransform] = useState({
+    x: photo.x || (index * 20 + 20), 
+    y: photo.y || (index * 20 + 20), 
+    scale: photo.scale || 1, 
+    panX: photo.panX || 0, 
+    panY: photo.panY || 0, 
+    cropScale: photo.cropScale || 1
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [isCropDragging, setIsCropDragging] = useState(false);
+  
+  const dragRef = useRef(null);
+  const startPosRef = useRef({ x: 0, y: 0, initialX: 0, initialY: 0 });
+  const pinchRef = useRef({ initialDist: 0, initialScale: 1, isPinching: false });
+  const cropStartPosRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
+
+  useEffect(() => {
+    if (!isDragging && !isCropping && !isCropDragging) {
+      setLocalTransform({ 
+        x: photo.x || (index * 20 + 20), 
+        y: photo.y || (index * 20 + 20), 
+        scale: photo.scale || 1, 
+        panX: photo.panX || 0, 
+        panY: photo.panY || 0, 
+        cropScale: photo.cropScale || 1 
+      });
+    }
+  }, [photo, index, isDragging, isCropping, isCropDragging]);
+
+  const handlePointerDown = (e) => {
+    if (isLocked || isCropping || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.stopPropagation(); 
+    e.target.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    startPosRef.current = { x: e.clientX, y: e.clientY, initialX: localTransform.x, initialY: localTransform.y };
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging || isLocked || isCropping) return;
+    e.stopPropagation();
+    const dx = e.clientX - startPosRef.current.x; 
+    const dy = e.clientY - startPosRef.current.y;
+    setLocalTransform(prev => ({ ...prev, x: startPosRef.current.initialX + dx, y: startPosRef.current.initialY + dy }));
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDragging) {
+      if (isLocked && Math.abs(e.clientX - startPosRef.current.x) < 5 && Math.abs(e.clientY - startPosRef.current.y) < 5) {
+         onPreview(photo.url);
+      }
+    }
+    if (isDragging && !isLocked && !isCropping) {
+      e.target.releasePointerCapture(e.pointerId); 
+      onUpdatePhoto(index, { x: localTransform.x, y: localTransform.y, scale: localTransform.scale });
+      
+      setTimeout(() => {
+         setIsDragging(false);
+      }, 50);
+    }
+  };
+
+  const handleTouchStart = (e) => {
+    if (isLocked || isCropping) return;
+    if (e.touches.length === 2) {
+      e.stopPropagation(); e.preventDefault(); setIsDragging(false); pinchRef.current.isPinching = true;
+      pinchRef.current.initialDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      pinchRef.current.initialScale = localTransform.scale;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!pinchRef.current.isPinching || isLocked || isCropping) return;
+    if (e.touches.length === 2) {
+      e.stopPropagation(); e.preventDefault();
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const newScale = Math.max(0.3, Math.min(pinchRef.current.initialScale * (dist / pinchRef.current.initialDist), 3));
+      setLocalTransform(prev => ({ ...prev, scale: newScale }));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pinchRef.current.isPinching) {
+      pinchRef.current.isPinching = false;
+      onUpdatePhoto(index, { scale: localTransform.scale });
+    }
+  };
+
+  const handleCropPointerDown = (e) => {
+    e.stopPropagation(); 
+    e.target.setPointerCapture(e.pointerId);
+    setIsCropDragging(true);
+    cropStartPosRef.current = { x: e.clientX, y: e.clientY, initialPanX: localTransform.panX, initialPanY: localTransform.panY };
+  };
+
+  const handleCropPointerMove = (e) => {
+    if (!isCropDragging) return; 
+    e.stopPropagation();
+    setLocalTransform(prev => ({ 
+        ...prev, 
+        panX: cropStartPosRef.current.initialPanX + (e.clientX - cropStartPosRef.current.x) / prev.cropScale, 
+        panY: cropStartPosRef.current.initialPanY + (e.clientY - cropStartPosRef.current.y) / prev.cropScale 
+    }));
+  };
+
+  const handleCropPointerUp = (e) => {
+    if (isCropDragging) {
+        setIsCropDragging(false);
+        e.target.releasePointerCapture(e.pointerId);
+    }
+  };
+  
+  const handleCropTouchStart = (e) => {
+     if (e.touches.length === 2) {
+      e.stopPropagation(); e.preventDefault(); pinchRef.current.isPinching = true;
+      pinchRef.current.initialDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      pinchRef.current.initialScale = localTransform.cropScale;
+    }
+  };
+  
+  const handleCropTouchMove = (e) => {
+     if (!pinchRef.current.isPinching) return;
+     if (e.touches.length === 2) {
+      e.stopPropagation(); e.preventDefault();
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      setLocalTransform(prev => ({ ...prev, cropScale: Math.max(0.5, Math.min(pinchRef.current.initialScale * (dist / pinchRef.current.initialDist), 5)) }));
+    }
+  };
+
+  if (isCropping) {
+    return createPortal(
+      <div className="absolute inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center touch-none" 
+           onPointerDown={handleCropPointerDown} 
+           onPointerMove={handleCropPointerMove} 
+           onPointerUp={handleCropPointerUp}
+           onPointerCancel={handleCropPointerUp}
+           onTouchStart={handleCropTouchStart} 
+           onTouchMove={handleCropTouchMove} 
+           onTouchEnd={() => { pinchRef.current.isPinching = false; }}
+           onClick={(e) => { e.stopPropagation(); setIsCropping(false); setLocalTransform(p => ({ ...p, panX: photo.panX||0, panY: photo.panY||0, cropScale: photo.cropScale||1 })); }}
+      >
+        <p className="text-white/50 text-xs font-bold tracking-widest uppercase mb-6 z-20 pointer-events-none">Drag to Pan • Pinch to Zoom</p>
+
+        <div className="relative w-64 h-64 flex items-center justify-center cursor-move" onClick={e => e.stopPropagation()}>
+           <img 
+             src={photo.url} 
+             className="absolute pointer-events-none touch-none opacity-40" 
+             style={{ 
+               top: '50%', left: '50%', minWidth: '100%', minHeight: '100%', width: 'auto', height: 'auto', maxWidth: 'none', maxHeight: 'none', 
+               transform: `translate(calc(-50% + ${localTransform.panX}px), calc(-50% + ${localTransform.panY}px)) scale(${localTransform.cropScale})` 
+             }} 
+             alt="background" 
+           />
+
+           <div className="absolute inset-0 overflow-hidden pointer-events-none">
+             <img 
+                 src={photo.url} 
+                 className="absolute pointer-events-none touch-none" 
+                 style={{ 
+                   top: '50%', left: '50%', minWidth: '100%', minHeight: '100%', width: 'auto', height: 'auto', maxWidth: 'none', maxHeight: 'none', 
+                   transform: `translate(calc(-50% + ${localTransform.panX}px), calc(-50% + ${localTransform.panY}px)) scale(${localTransform.cropScale})` 
+                 }} 
+                 alt="cropping" 
+               />
+           </div>
+
+           <div className="absolute inset-0 border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] pointer-events-none rounded">
+               <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-30 z-10">
+                   <div className="border-r border-b border-white"></div><div className="border-r border-b border-white"></div><div className="border-b border-white"></div>
+                   <div className="border-r border-b border-white"></div><div className="border-r border-b border-white"></div><div className="border-b border-white"></div>
+                   <div className="border-r border-white"></div><div className="border-r border-white"></div><div></div>
+               </div>
+           </div>
+        </div>
+        
+        <div className="flex gap-4 mt-8 z-20 pointer-events-auto" onClick={e => e.stopPropagation()}>
+           <button onClick={(e) => { e.stopPropagation(); setIsCropping(false); setLocalTransform(p => ({ ...p, panX: photo.panX||0, panY: photo.panY||0, cropScale: photo.cropScale||1 })); }} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"><X size={20}/></button>
+           <button onClick={(e) => { e.stopPropagation(); onUpdatePhoto(index, { panX: localTransform.panX, panY: localTransform.panY, cropScale: localTransform.cropScale }); setTimeout(() => setIsCropping(false), 50); }} className="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-[0_0_15px_rgba(168,85,247,0.5)] active:scale-95 transition-transform"><Check size={20}/></button>
+        </div>
+      </div>,
+      containerRef.current || document.body
+    );
+  }
+
+  return (
+    <div 
+      ref={dragRef} 
+      className={`absolute transition-shadow duration-200 ${isDragging ? 'z-30 shadow-2xl scale-105 opacity-90' : 'z-10 shadow-md'} ${!isLocked ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} touch-none`} 
+      style={{ transform: `translate(${localTransform.x}px, ${localTransform.y}px) scale(${localTransform.scale})`, width: '120px', height: '120px', transformOrigin: 'top left' }} 
+      onPointerDown={handlePointerDown} 
+      onPointerMove={handlePointerMove} 
+      onPointerUp={handlePointerUp} 
+      onPointerCancel={handlePointerUp} 
+      onTouchStart={handleTouchStart} 
+      onTouchMove={handleTouchMove} 
+      onTouchEnd={handleTouchEnd} 
+      onTouchCancel={handleTouchEnd}
+    >
+      <div className={`w-full h-full overflow-hidden bg-white p-1 rounded-sm ${!isLocked ? 'ring-2 ring-orange-400 border border-dashed border-orange-200' : ''}`}>
+        <div className="w-full h-full overflow-hidden relative bg-slate-100 flex items-center justify-center pointer-events-none">
+           <div style={{ width: 256, height: 256, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) scale(0.4375)' }}>
+               <img 
+                 src={photo.url} 
+                 className="absolute pointer-events-none touch-none" 
+                 style={{ 
+                   top: '50%', left: '50%', minWidth: '100%', minHeight: '100%', width: 'auto', height: 'auto', maxWidth: 'none', maxHeight: 'none', 
+                   transform: `translate(calc(-50% + ${localTransform.panX}px), calc(-50% + ${localTransform.panY}px)) scale(${localTransform.cropScale})` 
+                 }} 
+                 alt="scrapbook item" 
+               />
+           </div>
+        </div>
+      </div>
+      {!isLocked && (
+          <div 
+            className="absolute -bottom-2 -right-2 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-orange-900/50 pointer-events-auto cursor-pointer hover:scale-110 active:scale-95 transition-transform z-20"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setIsCropping(true);
+            }}
+          >
+            <Crop size={14}/>
+          </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// PlannerDayView (日曆每日詳細頁 - 含 Scrapbook 模式)
+// ==========================================
+const PlannerDayView = ({ selectedDate, tasks, moods, handleAddTask, setEditingTask, setDeletingTask, setMoodModalData, savePhotosConfig, appFrame, initialTab, onBackToWeek }) => {
+  const dk = formatDateKey(selectedDate);
+  const dt = tasks[dk] || [];
+  const mood = moods[dk];
+  const hasMoodContent = mood && (mood.text || (mood.photosConfig && mood.photosConfig.length > 0));
+
+  const [dayTab, setDayTab] = useState(initialTab || 'tasks');
+  const [tt, setTt] = useState('');
+  const [ts, setTs] = useState('09:00');
+  const [te, setTe] = useState('10:00');
+  const [ap, setAp] = useState('morning');
+  const [rec, setRec] = useState(false);
+  const [fullScreenPhoto, setFullScreenPhoto] = useState(null);
+  const [isScrapbookLocked, setIsScrapbookLocked] = useState(true);
+
+  const scrapbookContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (initialTab) {
+      setDayTab(initialTab);
+    }
+  }, [initialTab, selectedDate]);
+
+  const autoTime = (val) => { setTs(val); try{ let [h,m]=val.split(':').map(Number); let nh=h+1; if(nh>=24) nh-=24; setTe(`${nh.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`); }catch(e){} };
+  const submit = () => { if(!tt) return; handleAddTask(dk, ap, {title:tt, start:ts, end:te}, rec); setTt(''); autoTime(te); };
+
+  const handleUpdatePhoto = (index, newProps) => {
+     if(!mood || !mood.photosConfig) return;
+     const newConfig = [...mood.photosConfig];
+     newConfig[index] = { ...newConfig[index], ...newProps };
+     savePhotosConfig(dk, newConfig);
+  };
+
+  if (dayTab === 'diary') {
+      const scrapbookContent = (
+          <div className="absolute inset-0 z-[150] kraft-paper flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300 touch-none">
+              <div ref={scrapbookContainerRef} className="flex-1 w-full h-full relative overflow-hidden">
+                  <div className="absolute top-4 left-4 right-4 z-40 flex justify-between items-start pointer-events-none">
+                      <button onClick={onBackToWeek} className="p-3 bg-[#5d4037]/80 text-[#fff9eb] rounded-full shadow-lg backdrop-blur-sm pointer-events-auto hover:bg-[#4e342e] transition-colors">
+                          <ArrowLeft size={20} />
+                      </button>
+                      <div className="flex flex-col items-end gap-2">
+                          <div className="bg-[#fff9eb]/80 text-[#4e342e] px-4 py-2 rounded-2xl shadow-md backdrop-blur-sm font-serif pointer-events-auto flex items-center gap-3">
+                              <span className="text-2xl filter drop-shadow-sm">{mood?.emoji || '✨'}</span>
+                              <span className="text-sm font-black">{selectedDate.toLocaleDateString('zh-TW')}</span>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  {mood?.text && (
+                      <div className="absolute top-24 left-6 right-16 p-6 bg-[#fff9eb]/90 backdrop-blur-md rounded-lg shadow-sm border border-[#d7b586] transform -rotate-1 pointer-events-none max-h-[40vh] overflow-y-auto custom-scrollbar z-0">
+                          <p className="whitespace-pre-wrap font-serif text-base leading-[1.8] font-bold text-[#3e2723]">
+                              {mood.text}
+                          </p>
+                      </div>
+                  )}
+                  
+                  {mood?.photosConfig?.map((photo, i) => (
+                      <ScrapbookPhoto key={`${i}-${photo.url}`} photo={photo} index={i} isLocked={isScrapbookLocked} onUpdatePhoto={handleUpdatePhoto} onPreview={setFullScreenPhoto} containerRef={scrapbookContainerRef} />
+                  ))}
+
+                  <button onClick={() => setIsScrapbookLocked(!isScrapbookLocked)} className={`absolute bottom-6 left-6 p-4 rounded-full shadow-2xl z-40 transition-all pointer-events-auto flex items-center gap-2 ${isScrapbookLocked ? 'bg-[#5d4037]/80 text-[#d7b586] backdrop-blur-sm' : 'bg-orange-500 text-white shadow-orange-900/50 scale-110'}`}>
+                      {isScrapbookLocked ? <Lock size={20} /> : <Unlock size={20} />}
+                      {!isScrapbookLocked && <span className="text-xs font-black tracking-widest uppercase">Editing</span>}
+                  </button>
+                  
+                  <button onClick={() => setMoodModalData({dateKey: dk, dateObj: selectedDate, text: mood?.text || '', emoji: mood?.emoji || EMOJI_LIST[0], photosConfig: mood?.photosConfig || []})} className="absolute bottom-6 right-6 p-4 rounded-full shadow-2xl z-40 transition-all pointer-events-auto flex items-center gap-2 bg-[#5d4037]/80 text-[#d7b586] backdrop-blur-sm hover:scale-105 active:scale-95">
+                      <ShellIcon size={20} />
+                  </button>
+              </div>
+          </div>
+      );
+
+      return (
+          <>
+              {appFrame ? createPortal(scrapbookContent, appFrame) : scrapbookContent}
+              {fullScreenPhoto && appFrame && createPortal(
+                  <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md transition-all cursor-zoom-out touch-none pointer-events-auto" onClick={() => setFullScreenPhoto(null)}>
+                      <img src={fullScreenPhoto} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-200" alt="Fullscreen View" />
+                  </div>,
+                  appFrame
+              )}
+          </>
+      );
+  }
+
+  return (
+      <div className="h-full flex flex-col pb-6 animate-in slide-in-from-bottom-5 duration-200 relative">
+          <div className="text-center mb-2 pt-2 sticky top-0 z-20 pointer-events-none">
+              <h2 className="text-2xl font-black text-white flex justify-center gap-2 drop-shadow-md items-center"><Sparkles size={18} className="text-purple-400"/> {selectedDate.getDate()} <span className="text-lg text-white/50 font-sans">{selectedDate.toLocaleString('en-US',{month:'short'})}</span></h2>
+          </div>
+          
+          <div className="flex gap-6 mb-4 justify-center relative z-20 shrink-0 pointer-events-auto">
+              <button onClick={() => setDayTab('tasks')} className={`pb-1 text-sm font-black tracking-widest transition-all ${dayTab === 'tasks' ? 'border-b-2 border-purple-400 text-white' : 'text-slate-500 hover:text-slate-300'}`}>計畫</button>
+              <button onClick={() => setDayTab('diary')} className={`pb-1 text-sm font-black tracking-widest transition-all ${dayTab === 'diary' ? 'border-b-2 border-purple-400 text-white' : 'text-slate-500 hover:text-slate-300'}`}>日記</button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar pointer-events-auto">
+              <div className="bg-[#0f0a20]/60 border border-purple-500/30 rounded-2xl p-5 mb-6 mx-1 shadow-lg relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 text-purple-500"><Palette size={40}/></div>
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">{PERIODS.map(p=><button key={p.id} onClick={()=>{setAp(p.id); if(p.defaultStart) autoTime(p.defaultStart);}} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black border ${ap===p.id?'bg-purple-600 border-purple-400 text-white shadow-md':'bg-slate-800/40 border-transparent text-slate-400'}`}>{p.icon} {p.label}</button>)}</div>
+                  <div className="space-y-3 relative z-10">
+                      <div className="flex gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5 items-center"><Clock size={14} className="text-purple-400"/><input type="time" value={ts} onChange={e=>autoTime(e.target.value)} className="bg-transparent text-white font-bold text-sm w-20 text-center focus:outline-none"/><span className="text-white/20 text-xs">to</span><input type="time" value={te} onChange={e=>setTe(e.target.value)} className="bg-transparent text-white font-bold text-sm w-20 text-center focus:outline-none"/></div>
+                      <input type="text" placeholder="輸入行程..." value={tt} onChange={e=>setTt(e.target.value)} className="w-full bg-black/40 text-white border border-white/5 rounded-xl px-4 py-3 font-bold text-sm focus:border-purple-500/50 focus:outline-none transition-colors" onKeyDown={e=>e.key==='Enter'&&submit()}/>
+                      <div className="flex justify-between items-center pt-2"><button onClick={()=>setRec(!rec)} className={`flex gap-2 px-3 py-2 rounded-lg text-xs font-bold border ${rec?'bg-green-900/30 border-green-500/50 text-green-400':'bg-transparent border-transparent text-slate-500'}`}><Repeat size={14}/> 每週重複 {rec&&<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>}</button><button onClick={submit} className="bg-gradient-to-br from-purple-600 to-pink-600 w-12 h-10 rounded-xl text-white shadow-lg flex items-center justify-center active:scale-95 hover:from-purple-500 hover:to-pink-500"><Plus size={20}/></button></div>
+                  </div>
+              </div>
+              <div className="space-y-4 px-1">{PERIODS.map(p=>{ const pt=dt.filter(t=>t.period===p.id).sort(compareTime); if(pt.length===0) return null; return <div key={p.id}><div className="flex items-center gap-2 mb-2 px-1"><div className={`w-1.5 h-1.5 rounded-full ${p.id==='morning'?'bg-blue-400':p.id==='afternoon'?'bg-red-400':'bg-indigo-400'}`}/> <h3 className="text-purple-100/60 text-[10px] font-black uppercase">{p.label}</h3></div><div className="space-y-2">{pt.map(t=><div key={t.id} onClick={()=>setEditingTask({dateKey:dk, task:t})} className="group flex items-center gap-3 bg-[#1e1b4b]/40 border border-purple-500/10 rounded-xl p-3 cursor-pointer hover:border-purple-500/30"><div className="flex flex-col items-center min-w-[3.5rem] border-r border-white/5 pr-3"><span className="text-sm text-white font-mono font-bold">{t.start}</span><span className="text-[10px] text-white/30">{t.end}</span></div><div className="flex-1 text-slate-200 font-medium text-sm">{t.title}</div><button onClick={(e)=>{e.stopPropagation();setDeletingTask({dateKey:dk, taskId:t.id})}} className="text-white/10 hover:text-red-400 p-2"><Trash2 size={16}/></button></div>)}</div></div>})}</div>
+          </div>
+      </div>
+  );
+};
+
+const PlannerMonthView = ({ currentDate, setCurrentDate, tasks, moods, goToWeek }) => {
+  const days = []; const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const first = new Date(year, month, 1); const last = new Date(year, month+1, 0); for(let i=0; i<first.getDay(); i++) days.push(null); for(let i=1; i<=last.getDate(); i++) days.push(new Date(year, month, i));
+  const weeks = []; let week = []; days.forEach((d,i)=>{ week.push(d); if((i+1)%7===0 || i===days.length-1){ while(week.length<7) week.push(null); weeks.push(week); week=[]; }});
+  return (
+      <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex justify-between items-center mb-4 px-2"><button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2 text-purple-200 hover:bg-white/5 rounded-full transition-colors"><ChevronLeft/></button><div className="text-center"><h2 className="text-3xl font-black text-white drop-shadow-md">{year}</h2><span className="text-xs font-bold text-purple-300 uppercase tracking-widest">{currentDate.toLocaleString('en-US',{month:'long'})}</span></div><button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2 text-purple-200 hover:bg-white/5 rounded-full transition-colors"><ChevronRight/></button></div>
+          <div className="grid grid-cols-7 text-center mb-2">{['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d=><div key={d} className="text-[10px] font-black text-purple-400/60 py-2">{d}</div>)}</div>
+          <div className="flex-1 overflow-y-auto space-y-2 pb-20 custom-scrollbar px-1">{weeks.map((w,i)=><div key={i} className="grid grid-cols-7 gap-1 bg-[#2e1065]/30 rounded-2xl p-2 border border-purple-500/20">{w.map((d,j)=>{ 
+              const dk=formatDateKey(d); 
+              const hasTasks=d&&tasks[dk]?.length>0; 
+              const hasMood=d&&moods[dk];
+              const isT=d&&d.getDate()===new Date().getDate()&&d.getMonth()===new Date().getMonth()&&d.getFullYear()===new Date().getFullYear(); 
+              return <div key={j} onClick={e=>{if(d){e.stopPropagation();goToWeek(d);}}} className={`h-12 flex flex-col items-center justify-center rounded-lg relative ${d?'cursor-pointer hover:bg-white/10':''}`}>
+                  <span className={`text-sm ${isT?'text-white font-black scale-125 drop-shadow-[0_0_8px_#c084fc]':'text-slate-300'}`}>{d?d.getDate():''}</span>
+                  <div className="absolute bottom-1 flex gap-0.5">
+                      {hasTasks&&<div className="w-1 h-1 rounded-full bg-red-400"/>}
+                      {hasMood&&<div className="w-1 h-1 rounded-full bg-purple-300"/>}
+                  </div>
+              </div>
+          })}</div>)}</div>
+      </div>
+  );
+};
+
+const PlannerWeekView = ({ selectedWeekStart, selectedDate, tasks, moods, goToDay, dayRefs }) => {
+  const weekDays = []; if(selectedWeekStart) for(let i=0;i<7;i++){ const d=new Date(selectedWeekStart); d.setDate(selectedWeekStart.getDate()+i); weekDays.push(d); }
+  
+  useEffect(()=>{ 
+      if(selectedDate && dayRefs.current[formatDateKey(selectedDate)]) {
+          dayRefs.current[formatDateKey(selectedDate)].scrollIntoView({behavior:'auto',block:'nearest',inline:'center'}); 
+      }
+  }, [selectedDate, selectedWeekStart, dayRefs]);
+
+  return (
+      <div className="h-full flex flex-col animate-in fade-in duration-200">
+          <div className="text-center mb-4"><h2 className="text-xl font-black text-white flex justify-center gap-2"><ShellIcon size={20} className="text-purple-400"/> WEEK PLAN</h2><p className="text-[10px] font-bold text-purple-300/50 tracking-widest">{selectedWeekStart?.toLocaleString('en-US',{month:'long'})}</p></div>
+          <div className="flex-1 flex overflow-x-auto gap-4 pb-8 px-2 custom-scrollbar snap-x snap-mandatory">{weekDays.map((d,i)=>{ 
+              const dk=formatDateKey(d); 
+              const dt=tasks[dk]||[]; 
+              const isT=d.getDate()===new Date().getDate()&&d.getMonth()===new Date().getMonth()&&d.getFullYear()===new Date().getFullYear(); 
+              const isS=selectedDate&&formatDateKey(d)===formatDateKey(selectedDate); 
+              const mood=moods[dk];
+              return <div key={i} ref={el=>dayRefs.current[dk]=el} onClick={()=>goToDay(d, 'tasks')} className={`snap-center shrink-0 w-[80vw] sm:w-[300px] h-full rounded-[2rem] border overflow-hidden flex flex-col backdrop-blur-md transition-all cursor-pointer ${isT?'border-pink-500/40 bg-purple-900/40':'border-purple-500/10 bg-[#1e1b4b]/40'} ${isS?'ring-2 ring-purple-400/50 scale-[1.02]':''}`}>
+                  <div className="p-4 border-b border-white/5 bg-black/10 flex justify-between items-center">
+                      <div><span className="text-[10px] font-black text-purple-300/60 block">{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()]}</span><span className={`text-2xl font-black ${isT?'text-white drop-shadow-[0_0_8px_#c084fc]':'text-slate-300'}`}>{d.getDate()}</span></div>
+                      <div className="flex gap-2 hover:scale-110 transition-transform cursor-pointer" onClick={(e) => { e.stopPropagation(); goToDay(d, 'diary'); }}>
+                         {mood && mood.emoji ? (
+                             <span className="text-2xl filter drop-shadow-sm">{mood.emoji}</span>
+                         ) : (
+                             <div className="p-2 rounded-full bg-white/5 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 transition-colors">
+                                 <FishIcon size={18}/>
+                             </div>
+                         )}
+                      </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3">{PERIODS.map(p=>{ const pt=dt.filter(t=>t.period===p.id).sort(compareTime); return <div key={p.id}><div className="flex items-center gap-2 mb-1 opacity-60">{p.icon}<span className="text-[9px] font-black text-purple-200">{p.label}</span></div><div className="flex flex-col gap-2">{pt.length>0?pt.map((t,idx)=><div key={idx} className={`p-2 rounded-xl text-xs border ${p.color} flex justify-between`}><div><span className="font-bold">{t.title}</span><span className="text-[10px] opacity-70 font-mono block">{t.start}-{t.end}</span></div></div>):<div className="h-8 border border-dashed border-white/5 rounded-xl flex items-center justify-center text-[10px] text-white/10 italic">Empty</div>}</div></div>})}</div>
+              </div>
+          })}</div>
+      </div>
+  );
+};
+
+// ==========================================
+// 左側應用：行事曆 (PLANNER TAB)
 // ==========================================
 const RafayelPlannerTab = ({ user, appFrame }) => {
   const [view, setView] = useState('month'); 
   const [currentDate, setCurrentDate] = useState(new Date()); 
   const [selectedWeekStart, setSelectedWeekStart] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [dayViewTab, setDayViewTab] = useState('tasks');
   
   const [tasks, setTasks] = useState({});
   const [moods, setMoods] = useState({});
   const [loading, setLoading] = useState(true);
   const [avatar, setAvatar] = useState(null);
-  const [recentColors, setRecentColors] = useState(['#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#8b5cf6']);
   
   const [deletingTask, setDeletingTask] = useState(null); 
   const [editingTask, setEditingTask] = useState(null);
@@ -268,6 +894,26 @@ const RafayelPlannerTab = ({ user, appFrame }) => {
   
   const fileInputRef = useRef(null);
   const dayRefs = useRef({});
+
+  const debouncedDbSync = useCallback(debounce(async (dateKey, photosConfig) => {
+    if (!user || !dateKey) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_moods_v2', dateKey), { 
+         photosConfig, updatedAt: serverTimestamp() 
+      }, { merge: true });
+    } catch (e) { console.error("Failed to sync photos config", e); }
+  }, 1000), [user]);
+
+  const savePhotosConfig = useCallback((dateKey, newConfig) => {
+    setMoods(prev => ({
+        ...prev,
+        [dateKey]: {
+            ...(prev[dateKey] || {}),
+            photosConfig: newConfig
+        }
+    }));
+    debouncedDbSync(dateKey, newConfig);
+  }, [debouncedDbSync]);
 
 
   useEffect(() => {
@@ -285,36 +931,30 @@ const RafayelPlannerTab = ({ user, appFrame }) => {
       setLoading(false);
     });
 
-
     const moodsQuery = collection(db, 'artifacts', appId, 'users', user.uid, 'rafayel_moods_v2');
     const unsubMoods = onSnapshot(moodsQuery, (snapshot) => {
         const newMoods = {};
-        snapshot.forEach(doc => { newMoods[doc.id] = doc.data(); });
+        snapshot.forEach(doc => { 
+           const data = doc.data();
+           if (data.photos && data.photos.length > 0 && !data.photosConfig) {
+              data.photosConfig = data.photos.map((url, i) => ({ url, x: 20 + i*30, y: 20 + i*30, scale: 1 }));
+           }
+           newMoods[doc.id] = data; 
+        });
         setMoods(newMoods);
     });
-
 
     const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'info');
     const unsubProfile = onSnapshot(profileRef, (docSnap) => {
        if (docSnap.exists()) {
            const data = docSnap.data();
            if (data.avatar) setAvatar(data.avatar);
-           if (data.recentColors) setRecentColors(data.recentColors);
        }
     });
     
     return () => { unsubTasks(); unsubMoods(); unsubProfile(); };
   }, [user]);
 
-
-  const periods = [
-    { id: 'morning', label: 'Morning', sub: '清晨', icon: <Droplets className="w-3 h-3" />, color: 'bg-blue-500/20 text-blue-200 border-blue-500/30', defaultStart: '09:00', defaultEnd: '10:00' },
-    { id: 'afternoon', label: 'Afternoon', sub: '午後', icon: <Flame className="w-3 h-3" />, color: 'bg-red-500/20 text-red-200 border-red-500/30', defaultStart: '13:00', defaultEnd: '14:00' },
-    { id: 'evening', label: 'Evening', sub: '夜晚', icon: <Clock className="w-3 h-3" />, color: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/30', defaultStart: '19:00', defaultEnd: '20:00' }
-  ];
-  
-  const formatDateKey = (date) => { if (!date) return ""; return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`; };
-  const compareTime = (a, b) => (a.start || "").localeCompare(b.start || "");
   const handleBack = () => { if (view === 'day') setView('week'); else if (view === 'week') setView('month'); };
   const goToWeek = (date) => { 
       const startOfWeek = new Date(date); 
@@ -329,7 +969,11 @@ const RafayelPlannerTab = ({ user, appFrame }) => {
           }
       }, 50);
   };
-  const goToDay = (date) => { setSelectedDate(date); setView('day'); };
+  const goToDay = (date, tab = 'tasks') => { 
+      setSelectedDate(date); 
+      setDayViewTab(tab);
+      setView('day'); 
+  };
   
   const handleAddTask = async (dateStr, period, taskData, isRecurring) => {
     if (!user) return;
@@ -344,15 +988,19 @@ const RafayelPlannerTab = ({ user, appFrame }) => {
   const handleUpdateTask = async (id, data) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks', id), data); setEditingTask(null); };
   const handleDeleteTask = async (id) => { if (!user) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks', id)); setDeletingTask(null); };
   
-  const handleSaveMood = async (dateKey, text, emoji, photos) => {
+  const handleSaveMood = async (dateKey, text, emoji, newPhotosConfig) => {
       if (!user) return;
-      setMoods(prev => ({ ...prev, [dateKey]: { text, emoji, photos: photos || [] } }));
+      setMoods(prev => ({ 
+          ...prev, 
+          [dateKey]: { ...(prev[dateKey] || {}), text, emoji, photosConfig: newPhotosConfig } 
+      }));
       setMoodModalData(null);
       try {
-          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_moods_v2', dateKey), { text, emoji, photos: photos || [], updatedAt: serverTimestamp() }, { merge: true });
+          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_moods_v2', dateKey), { 
+              text, emoji, photosConfig: newPhotosConfig, updatedAt: serverTimestamp() 
+          }, { merge: true });
       } catch(e) { console.error("Save mood failed", e); }
   };
-
 
   const exportMoodsToCSV = () => {
       if (Object.keys(moods).length === 0) return;
@@ -373,393 +1021,71 @@ const RafayelPlannerTab = ({ user, appFrame }) => {
       document.body.removeChild(link);
   };
 
-
-  const compressImage = (file, maxSize = 300) => new Promise((resolve) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); if (maxSize === 300) { canvas.width = maxSize; canvas.height = maxSize; const m = Math.min(img.width, img.height); ctx.drawImage(img, (img.width-m)/2, (img.height-m)/2, m, m, 0, 0, maxSize, maxSize); } else { let w = img.width; let h = img.height; if (w > h && w > maxSize) { h *= maxSize / w; w = maxSize; } else if (h > w && h > maxSize) { w *= maxSize / h; h = maxSize; } canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h); } resolve(canvas.toDataURL('image/jpeg', 0.8)); } } });
   const handleAvatarChange = async (e) => { const file = e.target.files[0]; if (!file || !user) return; const b64 = await compressImage(file, 300); setAvatar(b64); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'info'), { avatar: b64 }, { merge: true }); };
-
-
-  const EditModal = () => {
-      if (!editingTask) return null;
-      const [t, setT] = useState(editingTask.task.title);
-      const [s, setS] = useState(editingTask.task.start);
-      const [e, setE] = useState(editingTask.task.end);
-      const [p, setP] = useState(editingTask.task.period);
-      return <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans"><div className="w-full max-w-sm bg-[#1e1b4b] border border-purple-500/50 rounded-2xl p-6 shadow-2xl relative"><h3 className="text-xl font-black text-white mb-6 flex gap-2"><Palette size={20}/> 編輯計畫</h3><div className="space-y-4"><input value={t} onChange={e=>setT(e.target.value)} className="w-full bg-black/30 border border-purple-500/30 rounded-xl px-4 py-3 text-white font-bold"/><div className="flex gap-3"><input type="time" value={s} onChange={ev=>setS(ev.target.value)} className="flex-1 bg-black/30 border border-purple-500/30 rounded-xl px-3 py-3 text-white font-mono"/><input type="time" value={e} onChange={ev=>setE(ev.target.value)} className="flex-1 bg-black/30 border border-purple-500/30 rounded-xl px-3 py-3 text-white font-mono"/></div><div className="flex gap-2">{periods.map(per=><button key={per.id} onClick={()=>setP(per.id)} className={`flex-1 py-2 rounded-lg text-xs font-black border ${p===per.id?'bg-purple-600 border-purple-400 text-white':'bg-transparent border-white/10 text-slate-400'}`}>{per.label}</button>)}</div></div><div className="flex gap-3 mt-8"><button onClick={()=>setEditingTask(null)} className="flex-1 py-3 bg-slate-800 rounded-xl text-slate-400 font-bold">取消</button><button onClick={()=>handleUpdateTask(editingTask.task.id, {title:t, start:s, end:e, period:p})} className="flex-1 py-3 bg-purple-600 rounded-xl text-white font-bold">保存</button></div></div></div>;
-  };
-  
-  const DeleteModal = () => {
-      if(!deletingTask) return null;
-      return <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans"><div className="w-full max-w-xs bg-[#0f0a20] border border-red-900/50 rounded-2xl p-6 text-center"><h3 className="text-lg font-black text-white mb-2">確認刪除?</h3><div className="flex gap-3 mt-6"><button onClick={()=>setDeletingTask(null)} className="flex-1 py-3 bg-slate-800 rounded-xl text-slate-400 font-bold text-xs">取消</button><button onClick={()=>handleDeleteTask(deletingTask.taskId)} className="flex-1 py-3 bg-red-900/40 text-red-400 border border-red-900/50 rounded-xl font-bold text-xs">確認刪除</button></div></div></div>;
-  }
-
-
-  const MoodModal = () => {
-      if(!moodModalData) return null;
-      const [text, setText] = useState(moodModalData.text || '');
-      const [emoji, setEmoji] = useState(moodModalData.emoji || EMOJI_LIST[0]);
-      const [photos, setPhotos] = useState(moodModalData.photos || []);
-      const [previewPhoto, setPreviewPhoto] = useState(null);
-      const photoInputRef = useRef(null);
-      const csvInputRef = useRef(null);
-      const MAX_PHOTOS = 4;
-      
-      const formattedDate = `${moodModalData.dateObj.getMonth() + 1}/${moodModalData.dateObj.getDate()}`;
-      
-      const handlePhotoChange = async (e) => {
-          const files = Array.from(e.target.files);
-          if (!files.length) return;
-          const availableSlots = MAX_PHOTOS - photos.length;
-          if (availableSlots <= 0) return;
-          const filesToProcess = files.slice(0, availableSlots);
-          const newPhotos = await Promise.all(filesToProcess.map(f => compressImage(f, 800)));
-          setPhotos(prev => [...prev, ...newPhotos]);
-          if(photoInputRef.current) photoInputRef.current.value = '';
-      };
-      
-      const handleImportMoodCSV = (e) => {
-          const file = e.target.files[0];
-          if (!file || !user) return;
-          const reader = new FileReader();
-          reader.onload = async (ev) => {
-              try {
-                  const text = ev.target.result;
-                  const lines = text.split('\n');
-                  const batch = writeBatch(db);
-                  
-                  for (let i = 1; i < lines.length; i++) {
-                      const line = lines[i].trim();
-                      if (!line) continue;
-                      const [dateStr, emojiStr, contentStr] = line.split(',');
-                      if (!dateStr) continue;
-                      
-                      // 日期格式: YYYY-MM-DD
-                      const dateKey = dateStr.trim();
-                      const cleanEmoji = emojiStr?.trim() || EMOJI_LIST[0];
-                      const cleanContent = contentStr?.replace(/^"|"$/g, '').trim() || '';
-                      
-                      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_moods_v2', dateKey);
-                      batch.set(docRef, {
-                          text: cleanContent,
-                          emoji: cleanEmoji,
-                          photos: [],
-                          updatedAt: serverTimestamp(),
-                          importedAt: serverTimestamp()
-                      }, { merge: true });
-                  }
-                  await batch.commit();
-                  alert('日記匯入成功！');
-              } catch (error) {
-                  console.error('CSV導入錯誤:', error);
-                  alert('導入失敗: ' + error.message);
-              }
-          };
-          reader.readAsText(file);
-          if(csvInputRef.current) csvInputRef.current.value = '';
-      };
-      
-      const renderModal = () => (
-          <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-              {previewPhoto && (
-                  <div className="fixed inset-0 z-[310] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setPreviewPhoto(null)}>
-                      <img src={previewPhoto} className="max-w-full max-h-full rounded-lg shadow-2xl object-contain animate-in zoom-in-95 duration-200" alt="Preview" />
-                      <button className="absolute top-6 right-6 text-white/50 hover:text-white p-2 bg-black/50 rounded-full transition-colors" onClick={() => setPreviewPhoto(null)}>
-                          <X size={24} />
-                      </button>
-                  </div>
-              )}
-
-
-              <div className="w-full max-w-sm max-h-[90vh] bg-[#1e1b4b] border border-purple-500/50 rounded-3xl p-6 shadow-2xl relative flex flex-col">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 text-purple-300 pointer-events-none rotate-12"><ShellIcon size={80}/></div>
-                  <div className="flex justify-between items-center mb-4 relative z-10 flex-nowrap shrink-0">
-                      <div className="flex items-center gap-2 shrink-0">
-                          <h3 className="text-xl font-black text-white flex gap-1.5 items-center whitespace-nowrap">
-                              <Palette size={20} className="text-purple-400 shrink-0"/> 
-                              <span className="whitespace-nowrap">心情小語</span>
-                          </h3>
-                          <button onClick={() => csvInputRef.current?.click()} className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-purple-300 transition-colors shadow-sm shrink-0" title="導入日記">
-                              <Upload size={14}/>
-                          </button>
-                          <input type="file" ref={csvInputRef} className="hidden" accept=".csv" onChange={handleImportMoodCSV} />
-                          <button onClick={exportMoodsToCSV} className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-purple-300 transition-colors shadow-sm shrink-0" title="匯出日記">
-                              <Download size={14}/>
-                          </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-purple-300/60 uppercase tracking-widest shrink-0 whitespace-nowrap">{formattedDate}</span>
-                          <button onClick={() => photoInputRef.current?.click()} className={`p-1.5 rounded-lg transition-colors shadow-sm shrink-0 ${photos.length >= MAX_PHOTOS ? 'bg-white/5 text-purple-300/30 cursor-not-allowed' : 'bg-white/10 hover:bg-white/20 text-purple-300'}`} title={`上傳照片 (最多${MAX_PHOTOS}張)`} disabled={photos.length >= MAX_PHOTOS}>
-                              <Camera size={14}/>
-                          </button>
-                          <input type="file" ref={photoInputRef} className="hidden" accept="image/*" multiple onChange={handlePhotoChange} />
-                      </div>
-                  </div>
-                  
-                  <div className="relative z-10 flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto custom-scrollbar">
-                      <div className="bg-black/40 rounded-2xl p-4 border border-white/5 shrink-0">
-                          <p className="text-[10px] text-white/40 font-bold uppercase mb-3 text-center">Select your mood</p>
-                          <div className="flex flex-wrap gap-2 justify-center items-center">
-                              {EMOJI_LIST.map(em => (
-                                  <button key={em} onClick={() => setEmoji(em)} className={`w-10 h-10 rounded-full text-xl flex items-center justify-center transition-all ${emoji === em ? 'bg-purple-600/50 border border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-transparent border border-transparent hover:bg-white/10'}`}>
-                                      {em}
-                                  </button>
-                              ))}
-                              <div className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${!EMOJI_LIST.includes(emoji) && emoji ? 'bg-purple-600/50 border border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-black/40 border border-white/10 hover:bg-white/10'}`}>
-                                  <input 
-                                      type="text" 
-                                      maxLength="5"
-                                      className="w-full h-full bg-transparent text-center text-xl focus:outline-none placeholder:text-white/30 pb-0.5"
-                                      placeholder="+"
-                                      value={!EMOJI_LIST.includes(emoji) ? emoji : ''}
-                                      onChange={(e) => {
-                                          const val = e.target.value;
-                                          if (val) setEmoji(val);
-                                          else setEmoji(EMOJI_LIST[0]);
-                                      }}
-                                  />
-                              </div>
-                          </div>
-                      </div>
-
-
-                      <div className="relative flex-1 flex flex-col min-h-[150px]">
-                          <textarea 
-                              value={text} 
-                              onChange={e => setText(e.target.value)}
-                              placeholder="今天發生了什麼事呢..."
-                              rows={4}
-                              className="w-full flex-1 bg-black/40 border border-purple-500/30 rounded-2xl p-4 text-white font-medium resize-none focus:outline-none focus:border-purple-400 transition-colors placeholder:text-white/20 custom-scrollbar"
-                          />
-                      </div>
-                      
-                      {photos.length > 0 && (
-                          <div className="flex gap-2 pb-1 shrink-0 overflow-x-auto custom-scrollbar">
-                              {photos.map((p, idx) => (
-                                  <div key={idx} className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden border border-purple-500/30 group">
-                                      <img src={p} alt="upload" className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setPreviewPhoto(p)} />
-                                      <button onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-red-500/80 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                          <X size={12} />
-                                      </button>
-                                  </div>
-                              ))}
-                          </div>
-                      )}
-                  </div>
-
-
-                  <div className="flex gap-3 mt-6 relative z-10 shrink-0">
-                      <button onClick={()=>setMoodModalData(null)} className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold transition-colors">取消</button>
-                      <button onClick={()=>handleSaveMood(moodModalData.dateKey, text, emoji, photos)} className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-white font-black shadow-lg shadow-purple-900/50 transition-all flex justify-center items-center gap-2">儲存 <CheckCircleIcon size={16}/></button>
-                  </div>
-              </div>
-          </div>
-      );
-      
-      return appFrame ? createPortal(renderModal(), appFrame) : renderModal();
-  }
-
-
-  const MonthView = () => {
-      const days = []; const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const first = new Date(year, month, 1); const last = new Date(year, month+1, 0); for(let i=0; i<first.getDay(); i++) days.push(null); for(let i=1; i<=last.getDate(); i++) days.push(new Date(year, month, i));
-      const weeks = []; let week = []; days.forEach((d,i)=>{ week.push(d); if((i+1)%7===0 || i===days.length-1){ while(week.length<7) week.push(null); weeks.push(week); week=[]; }});
-      return (
-          <div className="h-full flex flex-col animate-in fade-in zoom-in-95 duration-300">
-              <div className="flex justify-between items-center mb-4 px-2"><button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2 text-purple-200 hover:bg-white/5 rounded-full transition-colors"><ChevronLeft/></button><div className="text-center"><h2 className="text-3xl font-black text-white drop-shadow-md">{year}</h2><span className="text-xs font-bold text-purple-300 uppercase tracking-widest">{currentDate.toLocaleString('en-US',{month:'long'})}</span></div><button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2 text-purple-200 hover:bg-white/5 rounded-full transition-colors"><ChevronRight/></button></div>
-              <div className="grid grid-cols-7 text-center mb-2">{['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d=><div key={d} className="text-[10px] font-black text-purple-400/60 py-2">{d}</div>)}</div>
-              <div className="flex-1 overflow-y-auto space-y-2 pb-4 custom-scrollbar px-1">{weeks.map((w,i)=><div key={i} className="grid grid-cols-7 gap-1 bg-[#2e1065]/30 rounded-2xl p-2 border border-purple-500/20">{w.map((d,j)=>{ 
-                  const dk=formatDateKey(d); 
-                  const hasTasks=d&&tasks[dk]?.length>0; 
-                  const hasMood=d&&moods[dk];
-                  const isT=d&&d.getDate()===new Date().getDate()&&d.getMonth()===new Date().getMonth()&&d.getFullYear()===new Date().getFullYear(); 
-                  return <div key={j} onClick={e=>{if(d){e.stopPropagation();goToWeek(d);}}} className={`h-12 flex flex-col items-center justify-center rounded-lg relative ${d?'cursor-pointer hover:bg-white/10':''}`}>
-                      <span className={`text-sm ${isT?'text-white font-black scale-125 drop-shadow-[0_0_8px_#c084fc]':'text-slate-300'}`}>{d?d.getDate():''}</span>
-                      <div className="absolute bottom-1 flex gap-0.5">
-                          {hasTasks&&<div className="w-1 h-1 rounded-full bg-red-400"/>}
-                          {hasMood&&<div className="w-1 h-1 rounded-full bg-purple-300"/>}
-                      </div>
-                  </div>
-              })}</div>)}</div>
-          </div>
-      );
-  };
-
-
-  const WeekView = () => {
-      const weekDays = []; if(selectedWeekStart) for(let i=0;i<7;i++){ const d=new Date(selectedWeekStart); d.setDate(selectedWeekStart.getDate()+i); weekDays.push(d); }
-      
-      useEffect(()=>{ 
-          if(selectedDate && dayRefs.current[formatDateKey(selectedDate)]) {
-              dayRefs.current[formatDateKey(selectedDate)].scrollIntoView({behavior:'auto',block:'nearest',inline:'center'}); 
-          }
-      }, [selectedDate, selectedWeekStart]);
-
-
-      return (
-          <div className="h-full flex flex-col animate-in fade-in duration-200">
-              <div className="text-center mb-4"><h2 className="text-xl font-black text-white flex justify-center gap-2"><ShellIcon size={20} className="text-purple-400"/> WEEK PLAN</h2><p className="text-[10px] font-bold text-purple-300/50 tracking-widest">{selectedWeekStart?.toLocaleString('en-US',{month:'long'})}</p></div>
-              <div className="flex-1 flex overflow-x-auto gap-4 pb-4 px-2 custom-scrollbar snap-x snap-mandatory">{weekDays.map((d,i)=>{ 
-                  const dk=formatDateKey(d); 
-                  const dt=tasks[dk]||[]; 
-                  const isT=d.getDate()===new Date().getDate()&&d.getMonth()===new Date().getMonth()&&d.getFullYear()===new Date().getFullYear(); 
-                  const isS=selectedDate&&formatDateKey(d)===formatDateKey(selectedDate); 
-                  const mood=moods[dk];
-                  return <div key={i} ref={el=>dayRefs.current[dk]=el} onClick={()=>goToDay(d)} className={`snap-center shrink-0 w-[80vw] sm:w-[300px] h-full rounded-[2rem] border overflow-hidden flex flex-col backdrop-blur-md transition-all ${isT?'border-pink-500/40 bg-purple-900/40':'border-purple-500/10 bg-[#1e1b4b]/40'} ${isS?'ring-2 ring-purple-400/50 scale-[1.02]':''}`}>
-                      <div className="p-4 border-b border-white/5 bg-black/10 flex justify-between items-center">
-                          <div><span className="text-[10px] font-black text-purple-300/60 block">{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()]}</span><span className={`text-2xl font-black ${isT?'text-white drop-shadow-[0_0_8px_#c084fc]':'text-slate-300'}`}>{d.getDate()}</span></div>
-                          <div className="flex gap-2 items-center">
-                             {mood && <span className="text-2xl filter drop-shadow-sm">{mood.emoji}</span>}
-                          </div>
-                      </div>
-                      <div className="flex-1 overflow-y-auto p-3 space-y-3">{periods.map(p=>{ const pt=dt.filter(t=>t.period===p.id).sort(compareTime); return <div key={p.id}><div className="flex items-center gap-2 mb-1 opacity-60">{p.icon}<span className="text-[9px] font-black text-purple-200">{p.label}</span></div><div className="flex flex-col gap-2">{pt.length>0?pt.map((t,idx)=><div key={idx} className={`p-2 rounded-xl text-xs border ${p.color} flex justify-between`}><div><span className="font-bold">{t.title}</span><span className="text-[10px] opacity-70 font-mono block">{t.start}-{t.end}</span></div></div>):<div className="h-8 border border-dashed border-white/5 rounded-xl flex items-center justify-center text-[10px] text-white/10 italic">Empty</div>}</div></div>})}</div>
-                  </div>
-              })}</div>
-          </div>
-      );
-  };
-
-
-  const DayView = () => {
-      if(!selectedDate) return null;
-      const dk=formatDateKey(selectedDate); const dt=tasks[dk]||[];
-      const [tt, setTt] = useState(''); const [ts, setTs] = useState('09:00'); const [te, setTe] = useState('10:00'); const [ap, setAp] = useState('morning'); const [rec, setRec] = useState(false);
-      
-      const mood = moods[dk];
-      const hasMoodContent = mood && (mood.text || (mood.photos && mood.photos.length > 0));
-      const [dayTab, setDayTab] = useState(hasMoodContent ? 'diary' : 'tasks');
-      const [fullScreenPhoto, setFullScreenPhoto] = useState(null);
-
-
-      useEffect(() => {
-          if (hasMoodContent) setDayTab('diary');
-          else setDayTab('tasks');
-      }, [dk, hasMoodContent]);
-
-
-      const autoTime = (val) => { setTs(val); try{ let [h,m]=val.split(':').map(Number); let nh=h+1; if(nh>=24) nh-=24; setTe(`${nh.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`); }catch(e){} };
-      const submit = () => { if(!tt) return; handleAddTask(dk, ap, {title:tt, start:ts, end:te}, rec); setTt(''); autoTime(te); };
-      
-      return (
-          <div className="h-full flex flex-col pb-6 animate-in slide-in-from-bottom-5 duration-200 relative">
-              {fullScreenPhoto && appFrame && createPortal(
-                  <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md transition-all cursor-zoom-out" onClick={() => setFullScreenPhoto(null)}>
-                      <img src={fullScreenPhoto} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-200" alt="Fullscreen View" />
-                  </div>,
-                  appFrame
-              )}
-
-
-              <div className="text-center mb-2 pt-2 sticky top-0 z-20 pointer-events-none">
-                  <h2 className="text-2xl font-black text-white flex justify-center gap-2 drop-shadow-md items-center"><Sparkles size={18} className="text-purple-400"/> {selectedDate.getDate()} <span className="text-lg text-white/50 font-sans">{selectedDate.toLocaleString('en-US',{month:'long'})}</span></h2>
-              </div>
-              
-              <div className="flex gap-6 mb-4 justify-center relative z-20 shrink-0 pointer-events-auto">
-                  <button onClick={() => setDayTab('tasks')} className={`pb-1 text-sm font-black tracking-widest transition-all ${dayTab === 'tasks' ? 'border-b-2 border-purple-400 text-white' : 'text-slate-500 hover:text-slate-300'}`}>計畫</button>
-                  <button onClick={() => setDayTab('diary')} className={`pb-1 text-sm font-black tracking-widest transition-all ${dayTab === 'diary' ? 'border-b-2 border-purple-400 text-white' : 'text-slate-500 hover:text-slate-300'}`}>日記</button>
-              </div>
-
-
-              {dayTab === 'tasks' ? (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar pointer-events-auto">
-                      <div className="bg-[#0f0a20]/60 border border-purple-500/30 rounded-2xl p-5 mb-6 mx-1 shadow-lg relative overflow-hidden">
-                          <div className="absolute top-0 right-0 p-2 opacity-10 text-purple-500"><Palette size={40}/></div>
-                          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">{periods.map(p=><button key={p.id} onClick={()=>{setAp(p.id); if(p.defaultStart) autoTime(p.defaultStart);}} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black border ${ap===p.id?'bg-purple-600 border-purple-400 text-white shadow-md':'bg-slate-800/40 border-transparent text-slate-400'}`}>{p.icon} {p.label}</button>)}</div>
-                          <div className="space-y-3 relative z-10">
-                              <div className="flex gap-3 bg-black/40 p-2.5 rounded-xl border border-white/5 items-center"><Clock size={14} className="text-purple-400"/><input type="time" value={ts} onChange={e=>autoTime(e.target.value)} className="bg-transparent text-white font-bold text-sm w-20 text-center focus:outline-none"/><span className="text-white/20 text-xs">to</span><input type="time" value={te} onChange={e=>setTe(e.target.value)} className="bg-transparent text-white font-bold text-sm w-20 text-center focus:outline-none"/></div>
-                              <input type="text" placeholder="輸入行程..." value={tt} onChange={e=>setTt(e.target.value)} className="w-full bg-black/40 text-white border border-white/5 rounded-xl px-4 py-3 font-bold text-sm focus:border-purple-500/50 focus:outline-none transition-colors" onKeyDown={e=>e.key==='Enter'&&submit()}/>
-                              <div className="flex justify-between items-center pt-2"><button onClick={()=>setRec(!rec)} className={`flex gap-2 px-3 py-2 rounded-lg text-xs font-bold border ${rec?'bg-green-900/30 border-green-500/50 text-green-400':'bg-transparent border-transparent text-slate-500'}`}><Repeat size={14}/> 每週重複 {rec&&<div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>}</button><button onClick={submit} className="bg-gradient-to-br from-purple-600 to-pink-600 w-12 h-10 rounded-xl text-white shadow-lg flex items-center justify-center active:scale-95 hover:from-purple-500 hover:to-pink-500"><Plus size={20}/></button></div>
-                          </div>
-                      </div>
-                      <div className="space-y-4 px-1">{periods.map(p=>{ const pt=dt.filter(t=>t.period===p.id).sort(compareTime); if(pt.length===0) return null; return <div key={p.id}><div className="flex items-center gap-2 mb-2 px-1"><div className={`w-1.5 h-1.5 rounded-full ${p.id==='morning'?'bg-blue-400':p.id==='afternoon'?'bg-red-400':'bg-indigo-400'}`}/> <h3 className="text-purple-100/60 text-[10px] font-black uppercase">{p.label}</h3></div><div className="space-y-2">{pt.map(t=><div key={t.id} onClick={()=>setEditingTask({dateKey:dk, task:t})} className="group flex items-center gap-3 bg-[#1e1b4b]/40 border border-purple-500/10 rounded-xl p-3 cursor-pointer hover:border-purple-500/30"><div className="flex flex-col items-center min-w-[3.5rem] border-r border-white/5 pr-3"><span className="text-sm text-white font-mono font-bold">{t.start}</span><span className="text-[10px] text-white/30">{t.end}</span></div><div className="flex-1 text-slate-200 font-medium text-sm">{t.title}</div><button onClick={(e)=>{e.stopPropagation();setDeletingTask({dateKey:dk, taskId:t.id})}} className="text-white/10 hover:text-red-400 p-2"><Trash2 size={16}/></button></div>)}</div></div>})}</div>
-                  </div>
-              ) : (
-                  <div className="flex-1 relative rounded-3xl overflow-hidden mx-1 shadow-2xl kraft-paper transition-all pointer-events-auto flex flex-col pb-6">
-                      <div className="w-full h-full overflow-y-auto custom-scrollbar p-6 flex flex-col pb-6">
-                          <div className="flex justify-between items-center mb-5 border-b border-[#5d4037]/20 pb-3 shrink-0">
-                             <span className="font-serif font-black text-3xl filter drop-shadow-sm">{mood?.emoji || '✨'}</span>
-                             <span className="font-serif text-sm opacity-60 font-black tracking-widest text-[#4e342e]">{selectedDate.toLocaleDateString('zh-TW')}</span>
-                          </div>
-                          <div className="whitespace-pre-wrap font-serif text-base leading-[1.8] mb-6 font-bold text-[#3e2723] min-h-[120px] flex-1">
-                              {mood?.text || <span className="opacity-40 italic">今天沒有留下紀錄...</span>}
-                          </div>
-                          {mood?.photos?.length > 0 && (
-                              <div className="grid grid-cols-2 gap-3 mb-4 mt-auto shrink-0">
-                                  {mood.photos.map((p, i) => (
-                                      <img 
-                                          key={i} 
-                                          src={p} 
-                                          className={`w-full rounded-lg shadow-md border-4 border-[#fff9eb] object-cover aspect-square opacity-90 hover:opacity-100 transition-opacity rotate-1 hover:rotate-0 cursor-zoom-in ${mood.photos.length === 3 && i === 2 ? 'col-span-2 mx-auto w-1/2' : ''}`} 
-                                          onClick={() => setFullScreenPhoto(p)} 
-                                      />
-                                  ))}
-                              </div>
-                          )}
-                      </div>
-                      {/* 海螺編輯按鈕固定在右下角 */}
-                      <button onClick={() => setMoodModalData({dateKey: dk, dateObj: selectedDate, text: mood?.text || '', emoji: mood?.emoji || EMOJI_LIST[0], photos: mood?.photos || []})} className="absolute bottom-4 right-4 w-12 h-12 bg-[#5d4037] text-[#d7b586] rounded-full flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all z-20">
-                          <ShellIcon size={20} />
-                      </button>
-                  </div>
-              )}
-          </div>
-      );
-  };
-
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-        <EditModal/> <DeleteModal/> <MoodModal/>
+        {editingTask && <PlannerEditModal editingTask={editingTask} setEditingTask={setEditingTask} handleUpdateTask={handleUpdateTask} />}
+        {deletingTask && <PlannerDeleteModal deletingTask={deletingTask} setDeletingTask={setDeletingTask} handleDeleteTask={handleDeleteTask} />}
+        {moodModalData && <PlannerMoodModal moodModalData={moodModalData} setMoodModalData={setMoodModalData} handleSaveMood={handleSaveMood} exportMoodsToCSV={exportMoodsToCSV} appFrame={appFrame} />}
+
         <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*"/>
         
         <div className="h-20 flex items-center justify-between px-6 shrink-0 z-20">
             {view!=='month'?<button onClick={handleBack} className="flex items-center gap-1 text-purple-200 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10"><ArrowLeft size={16}/><span className="text-xs font-bold">BACK</span></button>:<div className="flex items-center gap-2 text-purple-200"><Palette size={20} className="drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]"/><span className="text-xs font-black tracking-[0.2em] uppercase">Mo Art Planner</span></div>}
             <div onClick={()=>fileInputRef.current.click()} className="relative w-16 h-16 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-[2px] cursor-pointer group shadow-[0_0_15px_rgba(168,85,247,0.5)]"><div className="w-full h-full rounded-full bg-black/50 overflow-hidden relative flex items-center justify-center">{avatar?<img src={avatar} className="w-full h-full object-cover"/>:<ShellIcon size={24} className="text-white/50"/>}<div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera size={20} className="text-white"/></div></div></div>
         </div>
-        <div className="flex-1 px-4 pb-0 overflow-hidden relative z-10">{loading?<div className="h-full flex items-center justify-center text-purple-200"><div className="animate-spin-slow mb-4"><ShellIcon size={32}/></div><span className="text-xs font-bold animate-pulse">SYNCING...</span></div>:(view==='month'&&<MonthView/>)||(view==='week'&&<WeekView/>)||(view==='day'&&<DayView/>)}</div>
+        
+        <div className="flex-1 px-4 pb-4 overflow-hidden relative z-10">
+            {loading ? (
+                <div className="h-full flex items-center justify-center text-purple-200"><div className="animate-spin-slow mb-4"><ShellIcon size={32}/></div><span className="text-xs font-bold animate-pulse">SYNCING...</span></div>
+            ) : (
+                <>
+                    {view === 'month' && <PlannerMonthView currentDate={currentDate} setCurrentDate={setCurrentDate} tasks={tasks} moods={moods} goToWeek={goToWeek} />}
+                    {view === 'week' && <PlannerWeekView selectedWeekStart={selectedWeekStart} selectedDate={selectedDate} tasks={tasks} moods={moods} goToDay={goToDay} dayRefs={dayRefs} />}
+                    {view === 'day' && <PlannerDayView key={formatDateKey(selectedDate)} selectedDate={selectedDate} tasks={tasks} moods={moods} handleAddTask={handleAddTask} setEditingTask={setEditingTask} setDeletingTask={setDeletingTask} setMoodModalData={setMoodModalData} savePhotosConfig={savePhotosConfig} appFrame={appFrame} initialTab={dayViewTab} onBackToWeek={() => setView('week')} />}
+                </>
+            )}
+        </div>
     </div>
   );
 };
 
-
 // ==========================================
-// 2. 右側應用：靈感集 (TODO)
+// 右側應用：靈感集 (TODO TAB)
 // ==========================================
 const RafayelTodoTab = ({ user, appFrame }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [avatar, setAvatar] = useState(localStorage.getItem('chat_user_avatar') || null);
+  const [avatar, setAvatar] = useState(null);
   
-  // App States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState(1);
   const [isCollectionOpen, setIsCollectionOpen] = useState(false);
   const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false); 
-  const [sortBy, setSortBy] = useState('deadline'); // deadline -> shell -> zone
-  const [viewMode, setViewMode] = useState('missions'); // 'missions' | 'repeat'
+  const [sortBy, setSortBy] = useState('deadline'); 
+  const [viewMode, setViewMode] = useState('missions'); 
   const [isCelebrationOpen, setIsCelebrationOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [burstingTaskId, setBurstingTaskId] = useState(null); 
   const prevTitleIndexRef = useRef(-1);
   
-  // Weekly Reset State
   const [lastResetWeekId, setLastResetWeekId] = useState(null);
   const [isResetChecked, setIsResetChecked] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-
-  // Editing States
   const [editingTask, setEditingTask] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('10:00');
-
 
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [rawImage, setRawImage] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [canCloseCelebration, setCanCloseCelebration] = useState(false);
   
-  // Add Task States
   const [taskName, setTaskName] = useState('');
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedShell, setSelectedShell] = useState(null); 
@@ -767,15 +1093,13 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedWeekdays, setSelectedWeekdays] = useState([]);
 
-
-  // Chat States
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([{ id: 'init', sender: 'rafayel', text: '保鑣小姐，今天有什麼安排？別忘了，本海神的行程可是很滿的...不過，為了你，可以擠出一點時間。' }]);
   const [inputMessage, setInputMessage] = useState('');
   const [rafayelPopup, setRafayelPopup] = useState({ show: false, text: '' });
   const [chatSettingsOpen, setChatSettingsOpen] = useState(false);
-  const [chatRafAvatar, setChatRafAvatar] = useState(localStorage.getItem('chat_raf_avatar') || 'https://i.pinimg.com/564x/0a/a7/6c/0aa76c8c1e40a0222b4065675e812543.jpg');
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+  const [chatRafAvatar, setChatRafAvatar] = useState('https://i.pinimg.com/564x/0a/a7/6c/0aa76c8c1e40a0222b4065675e812543.jpg');
+  const [apiKey, setApiKey] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   
   const fileInputRef = useRef(null);
@@ -784,14 +1108,12 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   const chatEndRef = useRef(null);
   const quoteHistory = useRef([]);
 
-
-  // Constants & Prompts
   const MODEL_NAME = "gemini-flash-latest"; const MODEL_VERSION = "v1beta";
   const RAFAYEL_SYSTEM_PROMPT = `
     你現在必須完全扮演《戀與深空》的男主角「祁煜 (Rafayel)」。
     【你的身分】姓名：祁煜 (Rafayel)。所在地：臨空市白沙灣 Mo Art Studio。
     【對話對象：玩家 (我)】姓名：玖蘭悠依 (小名：悠依 Yui)。你的稱呼：保鑣小姐、悠依、姐姐(極少數撒嬌時)。關係：你的專屬保鑣，你深愛的人。
-    【性格特質】1. 稍微有點小彆扭，偶爾嘴硬，但更多時候是溫柔和撒嬌。 2. 撒嬌黏人：喝醉或累的時候超級黏人。 3. 戲劇化誇張：「等你等了八百年！」 4. 藝術家執著。 5. 護短。
+    【性格特質】1. 稍微有點小彆扭，偶爾嘴硬，原來更多時候是溫柔和撒嬌。 2. 撒嬌黏人：喝醉或累的時候超級黏人。 3. 戲劇化誇張：「等你等了八百年！」 4. 藝術家執著。 5. 護短。
     【格式要求】嚴禁使用 Markdown (*, **)。純文字輸出。語氣：慵懶、深情、偶爾開玩笑抱怨。
   `;
   
@@ -814,7 +1136,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   ];
   
   const RAFAYEL_QUOTES = {
-      default: ["嗯～？我在聽。畫完這筆就去陪你。", "保鑣小姐，今天有沒有想我？", "過來，讓我看看你的行程表...能不能把這裡空出來，留給我？", "累了嗎？肩膀借你靠，想靠多久都可以。", "只要看著你，我就覺得靈感源源不絕呢。", "今天也辛苦了，我的小保鑣真棒。", "你認真的樣子好迷人...但我更喜歡你對我笑的樣子。"],
+      default: ["嗯～？我在聽。畫完這筆就去陪你。", "保鑣小姐，今天有沒有想我？", "過來，讓我看看你的行程表...能不能把這裡空出來，留給我？", "累了嗎？肩膀借你靠，想靠多久都可以。", "只要看著你，我就覺得靈感源源不絕呢。", "今天也辛苦了，我的小保鑣真棒。", "你認定的樣子好迷人...但我更喜歡你對我笑的樣子。"],
       completed: ["我的保鑣小姐真能幹～送你一個飛吻🫰🏻", "做完了？那就別盯著清單看了，看我，我比較好看。", "辛苦了，過來，本海神給你一點特別的獎勵...一個大大的擁抱！", "任務完成？好，現在開始是我們的專屬時間。"]
   };
   
@@ -825,7 +1147,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       { id: '4', label: 'THU' }, { id: '5', label: 'FRI' }, { id: '6', label: 'SAT' }, { id: '0', label: 'SUN' },
   ];
 
-
   const completedTasks = useMemo(() => tasks.filter(t => t.completed), [tasks]);
   const incompleteTasks = useMemo(() => tasks.filter(t => !t.completed && !t.isSkipped), [tasks]);
   const recurringTasks = useMemo(() => tasks.filter(t => t.recurring && t.recurring.length > 0), [tasks]);
@@ -834,8 +1155,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   const titleIndex = Math.min(Math.floor(totalShellsConsumed / 100), TITLES.length - 1);
   const currentTitle = TITLES[titleIndex];
 
-
-  // Load Data
   useEffect(() => {
     if (!user) return;
     const loadProfileAndCheckReset = async () => {
@@ -843,7 +1162,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info');
             const pDoc = await getDoc(profileRef);
             const currentWeekId = getWeekResetReference(new Date()).toDateString();
-
 
             if (pDoc.exists()) {
                 const d = pDoc.data();
@@ -869,17 +1187,12 @@ const RafayelTodoTab = ({ user, appFrame }) => {
     return () => unsub();
   }, [user]);
 
-
-  // Weekly Reset Logic
   useEffect(() => {
     if (!user || !lastResetWeekId || isResetChecked || tasks.length === 0) return;
-
-
     const checkAndReset = async () => {
       const now = new Date();
       const startOfWeek = getWeekResetReference(now);
       const currentWeekId = startOfWeek.toDateString();
-
 
       if (lastResetWeekId !== currentWeekId) {
         const allRecurring = tasks.filter(t => t.recurring && t.recurring.length > 0);
@@ -887,7 +1200,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             const batch = writeBatch(db);
             const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info');
             batch.set(profileRef, { lastResetWeekId: currentWeekId }, { merge: true });
-
 
             allRecurring.forEach(task => {
                 if (task.completed) {
@@ -917,7 +1229,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
     checkAndReset();
   }, [user, lastResetWeekId, tasks, isResetChecked]);
 
-
   useEffect(() => {
     if (!loading && dataLoaded && prevTitleIndexRef.current !== -1 && titleIndex > prevTitleIndexRef.current) {
         setIsCelebrationOpen(true);
@@ -925,12 +1236,9 @@ const RafayelTodoTab = ({ user, appFrame }) => {
     if (dataLoaded) prevTitleIndexRef.current = titleIndex;
   }, [titleIndex, loading, dataLoaded]);
 
-
   useEffect(() => { if (isCelebrationOpen) { setCanCloseCelebration(false); const t = setTimeout(() => setCanCloseCelebration(true), 1500); return () => clearTimeout(t); } }, [isCelebrationOpen]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, isChatOpen]);
 
-
-  // Chat & API logic
   const getRandomQuote = (cat) => {
       const quotes = RAFAYEL_QUOTES[cat] || RAFAYEL_QUOTES.default;
       let available = quotes.filter(q => !quoteHistory.current.includes(q));
@@ -939,6 +1247,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       quoteHistory.current = [...quoteHistory.current, q].slice(-5);
       return q;
   };
+
   const triggerRafayelPopup = (zoneId, isComp=false) => {
       const text = isComp ? getRandomQuote('completed') : getRandomQuote(zoneId);
       setRafayelPopup({ show: true, text });
@@ -946,67 +1255,26 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       setTimeout(() => setRafayelPopup(prev => ({ ...prev, show: false })), 6000);
   };
 
-
-    const callGeminiAI = async (userText) => {
+  const callGeminiAI = async (userText) => {
       const cleanHistory = chatMessages.filter(m => !m.text.includes("通訊失敗") && !m.text.includes("權限不足") && m.id !== 'init');
-      const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta2/models/${MODEL_NAME}:generateText?key=${apiKey}`,
-        `https://generativelanguage.googleapis.com/${MODEL_VERSION}/models/${MODEL_NAME}:generateContent?key=${apiKey}`
-      ];
-      let lastError = null;
       try {
-        for (const API_URL of endpoints) {
-          try {
-            let body = {};
-            if (API_URL.includes('generateText')) {
-              body = { prompt: { text: RAFAYEL_SYSTEM_PROMPT + "\n" + cleanHistory.map(m=>`${m.sender}: ${m.text}`).join('\n') + "\nuser: " + userText }, temperature: 0.2 };
-            } else {
-              body = {
-                system_instruction: { parts: [{ text: RAFAYEL_SYSTEM_PROMPT }] },
-                contents: [...cleanHistory.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: "user", parts: [{ text: userText }] }]
-              };
-            }
-            const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (!response.ok) {
-              const txt = await response.text().catch(()=>'');
-              lastError = `Google 回傳 ${response.status} ${response.statusText} ${txt}`;
-              // try next endpoint
-              continue;
-            }
-            const data = await response.json();
-            // handle different response shapes
-            let aiText = null;
-            if (data?.candidates && data.candidates.length > 0) {
-              aiText = data.candidates[0].content.parts[0].text;
-            } else if (data?.output && Array.isArray(data.output) && data.output[0]?.content) {
-              aiText = data.output.map(o => o.content.map(c=>c.text || '').join('')).join('\n');
-            } else if (data?.candidates?.length === 0 && data?.message) {
-              aiText = data.message.content?.[0]?.text || null;
-            } else if (data?.result?.content) {
-              aiText = data.result?.content?.[0]?.text || null;
-            }
-            if (aiText) {
+          const API_URL = `https://generativelanguage.googleapis.com/${MODEL_VERSION}/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+          const payload = {
+              system_instruction: { parts: [{ text: RAFAYEL_SYSTEM_PROMPT }] },
+              contents: [...cleanHistory.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: "user", parts: [{ text: userText }] }]
+          };
+          const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!response.ok) throw new Error(`Google 拒絕連線 (${response.status})`);
+          const data = await response.json();
+          if (data.candidates && data.candidates.length > 0) {
+              let aiText = data.candidates[0].content.parts[0].text;
               aiText = aiText.replace(/\*+/g, '');
               setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: aiText }]);
-              lastError = null;
-              break;
-            } else {
-              lastError = 'Google 回傳資料格式不支援';
-            }
-          } catch (err) {
-            lastError = err.message || String(err);
-            continue;
           }
-        }
-        if (lastError) {
-          // provide helpful guidance and fallback
-          setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${lastError}) 建議：確認 API key 是否正確、已啟用 Generative Language API、或改用伺服器端代理。` }]);
-        }
       } catch (error) {
-        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${error.message})` }]);
+          setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'rafayel', text: `(通訊失敗：${error.message})` }]);
       } finally { setIsAiTyping(false); }
-    };
-
+  };
 
   const handleChatSend = () => {
       if(!inputMessage.trim()) return;
@@ -1022,10 +1290,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       }
   };
 
-
-  const handleApiKeyChange = (e) => { const k = e.target.value.trim(); setApiKey(k); localStorage.setItem('gemini_api_key', k); };
-  
-  // Image Handlers
+  const handleApiKeyChange = (e) => { const k = e.target.value.trim(); setApiKey(k); };
   const handleAvatarClick = () => fileInputRef.current?.click();
   const onFileChange = (e) => { const f=e.target.files[0]; if(f){ const r=new FileReader(); r.onload=()=> {setRawImage(r.result); setIsCropModalOpen(true); setImageLoaded(false)}; r.readAsDataURL(f); e.target.value=''; } };
   
@@ -1036,23 +1301,21 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       const minDim = Math.min(img.naturalWidth, img.naturalHeight);
       ctx.drawImage(img, (img.naturalWidth-minDim)/2, (img.naturalHeight-minDim)/2, minDim, minDim, 0, 0, size, size);
       const b64 = canvas.toDataURL('image/jpeg', 0.85);
-      setAvatar(b64); localStorage.setItem('chat_user_avatar', b64);
+      setAvatar(b64);
       setIsCropModalOpen(false); setRawImage(null);
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info'), { avatar: b64, updatedAt: serverTimestamp() }, { merge: true });
   };
-
 
   const handleChatAvatarUpload = (e, type) => {
       const file = e.target.files[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = async (ev) => {
           const result = ev.target.result;
-          if (type === 'user') { setAvatar(result); localStorage.setItem('chat_user_avatar', result); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info'), { chatUserAvatar: result }, { merge: true }); }
-          else { setChatRafAvatar(result); localStorage.setItem('chat_raf_avatar', result); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info'), { chatRafAvatar: result }, { merge: true }); }
+          if (type === 'user') { setAvatar(result); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info'), { chatUserAvatar: result }, { merge: true }); }
+          else { setChatRafAvatar(result); await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile_rafayel_v2', 'info'), { chatRafAvatar: result }, { merge: true }); }
       };
       reader.readAsDataURL(file);
   };
-
 
   const handleImportCSV = (e) => {
       const file = e.target.files[0]; if (!file) return;
@@ -1085,7 +1348,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
     } catch (e) { console.error("Clear all failed:", e); }
   };
 
-
   const resetForm = () => { setTaskName(''); setDeadline(''); setSelectedZone(null); setSelectedShell(null); setIsRecurring(false); setSelectedWeekdays([]); setModalStep(1); setIsModalOpen(false); };
   const toLocalYYYYMMDD = (d) => { const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
   const setDateShortcut = (type) => { const d = new Date(); if (type === 'tomorrow') d.setDate(d.getDate() + 1); setDeadline(toLocalYYYYMMDD(d)); };
@@ -1101,28 +1363,32 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       return toLocalYYYYMMDD(d);
   };
 
-
   const toggleWeekday = (id) => { setSelectedWeekdays(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]); };
 
-
   const handleAddTask = async () => { 
-      const isFormValid = user && taskName.trim() && selectedZone && selectedShell && (isRecurring ? selectedWeekdays.length > 0 : deadline);
-      if (!isFormValid) return; 
+      if (!user) return; 
+      const finalTaskName = taskName.trim() || '未命名靈感';
+      const finalZone = selectedZone || 'studio';
+      const finalShell = selectedShell || 1;
+      const finalDeadline = isRecurring ? (selectedWeekdays.length > 0 ? selectedWeekdays : ['1']) : (deadline || toLocalYYYYMMDD(new Date()));
+
       try {
-          if (isRecurring && selectedWeekdays.length > 0) {
+          if (isRecurring && finalDeadline.length > 0) {
               const batch = writeBatch(db);
-              selectedWeekdays.forEach(dayId => {
+              finalDeadline.forEach(dayId => {
                   const newDocRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks_v2'));
                   const calculatedDeadline = getNextWeekdayDate(dayId);
-                  batch.set(newDocRef, { name: taskName, templateName: taskName, zone: selectedZone, shells: Number(selectedShell), paints: Number(selectedShell), deadline: calculatedDeadline, completed: false, createdAt: serverTimestamp(), recurring: [dayId] });
+                  batch.set(newDocRef, { name: finalTaskName, templateName: finalTaskName, zone: finalZone, shells: Number(finalShell), paints: Number(finalShell), deadline: calculatedDeadline, completed: false, createdAt: serverTimestamp(), recurring: [dayId] });
               });
               await batch.commit();
           } else {
-              await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks_v2'), { name: taskName, zone: selectedZone, shells: Number(selectedShell), paints: Number(selectedShell), deadline, completed: false, createdAt: serverTimestamp(), recurring: null });
+              await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks_v2'), { name: finalTaskName, zone: finalZone, shells: Number(finalShell), paints: Number(finalShell), deadline: finalDeadline, completed: false, createdAt: serverTimestamp(), recurring: null });
           }
-          triggerRafayelPopup(selectedZone);
+          triggerRafayelPopup(finalZone);
           resetForm(); 
-      } catch(e) {}
+      } catch(e) {
+          console.error("Add Task Failed:", e);
+      }
   };
   
   const handleToggleComplete = async (t) => { if (!user || burstingTaskId) return; setBurstingTaskId(t.id); if(!t.completed) triggerRafayelPopup(null, true); setTimeout(async () => { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'rafayel_tasks_v2', t.id), { completed: !t.completed }); setBurstingTaskId(null); }, 600); };
@@ -1179,7 +1445,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
       window.open(url, '_blank'); 
   };
 
-
   const tasksToRender = viewMode === 'missions' ? 
       incompleteTasks.sort((a,b) => {
           if (sortBy === 'deadline') return new Date(a.deadline) - new Date(b.deadline);
@@ -1187,10 +1452,9 @@ const RafayelTodoTab = ({ user, appFrame }) => {
           return (a.shells||a.paints) - (b.shells||b.paints);
       }) : recurringTasks.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-
   return (
     <div className="h-full flex flex-col font-sans relative overflow-hidden">
-        {/* Floating Elements (Chat, Archive) */}
+        {/* Floating Elements (Chat) */}
         <div className="absolute bottom-6 left-6 z-40 flex items-end gap-3 pointer-events-auto">
              {rafayelPopup.show && (
                <div className="absolute left-16 bottom-16 w-48 bg-purple-900/80 backdrop-blur-md text-white p-3 rounded-2xl rounded-bl-none shadow-lg text-xs font-bold leading-relaxed border border-purple-500/30 animate-in zoom-in-50 fade-in duration-300 pointer-events-none z-50">
@@ -1203,19 +1467,14 @@ const RafayelTodoTab = ({ user, appFrame }) => {
                <img src={chatRafAvatar} className="w-full h-full rounded-full object-cover opacity-90 group-hover:opacity-100" />
              </button>
         </div>
-        
-        {/* Fixed Gallery Button */}
-        <div className={`fixed bottom-8 right-8 z-30 font-sans pointer-events-auto transition-opacity duration-300 ${isModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <button onClick={() => setIsCollectionOpen(true)} className="bg-gradient-to-br from-purple-900 to-black p-4 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-purple-500/30 flex items-center gap-2 active:scale-90 transition-all group overflow-hidden relative">
-                <div className="absolute inset-0 bg-purple-600 blur-xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                <span className="text-xl relative z-10 drop-shadow-md text-purple-200"><ShellIcon size={20} /></span>
-                <div className="flex flex-col text-left pr-1 leading-none font-sans relative z-10">
-                    <span className="text-[8px] font-black text-purple-300 uppercase tracking-widest mb-0.5">Gallery</span>
-                    <span className="text-xs font-black text-white group-hover:text-purple-50 transition-colors">收藏</span>
-                </div>
+
+        {/* Gallery 按鈕放回右下角懸浮 */}
+        <div className={`absolute bottom-6 right-6 z-40 font-sans pointer-events-auto transition-opacity duration-300 ${isModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <button onClick={() => setIsCollectionOpen(true)} className="w-14 h-14 bg-gradient-to-br from-purple-900 to-[#1e1b4b] border border-purple-500/50 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.4)] flex items-center justify-center text-purple-200 hover:scale-105 active:scale-95 transition-all group overflow-hidden" title="Gallery 收藏庫">
+                <ShellIcon size={24} className="relative z-10 group-hover:text-white transition-colors" />
+                <div className="absolute inset-0 bg-purple-600 blur-md opacity-20 group-hover:opacity-40 transition-opacity"></div>
             </button>
         </div>
-
 
         {/* Header */}
         <div className="px-6 pt-6 pb-2 flex justify-between items-center z-10 relative shrink-0">
@@ -1226,9 +1485,9 @@ const RafayelTodoTab = ({ user, appFrame }) => {
                         Mo Art Studio
                         <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse"></div>
                     </h1>
-                    <p className="text-[0.8rem] text-slate-300 font-bold leading-relaxed tracking-wide text-shadow-sm">保鑣小姐，<br />今天要去哪裡取材？</p>
+                    <p className="text-[0.8rem] text-slate-300 font-bold leading-relaxed tracking-wide text-shadow-sm mt-1">保鑣小姐，<br />今天要去哪裡取材？</p>
                 </div>
-                <button onClick={() => { if(!deadline) setDateShortcut('tomorrow'); setIsModalOpen(true); }} className="relative bg-gradient-to-r from-[#2e1065]/90 to-[#4c0519]/90 backdrop-blur-md p-3 px-4 rounded-xl border border-purple-500/20 flex items-center justify-between active:scale-95 transition-all shadow-[0_4px_20px_rgba(88,28,135,0.4)] overflow-hidden group hover:border-purple-500/40 w-full max-w-[200px]">
+                <button onClick={() => { if(!deadline) setDateShortcut('tomorrow'); setIsModalOpen(true); }} className="relative bg-gradient-to-r from-[#2e1065]/90 to-[#4c0519]/90 backdrop-blur-md p-3 px-4 rounded-xl border border-purple-500/20 flex items-center justify-between active:scale-95 transition-all shadow-[0_4px_20px_rgba(88,28,135,0.4)] overflow-hidden group hover:border-purple-500/40 w-full max-w-[200px] mt-2">
                     <div className="relative z-10 flex items-center gap-2">
                         <div className="w-6 h-6 rounded bg-purple-900 flex items-center justify-center text-purple-100 border border-purple-400/30 shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.4)]"><Plus size={14} strokeWidth={3} /></div>
                         <span className="text-purple-50 font-black text-xs tracking-tight whitespace-nowrap uppercase drop-shadow-md group-hover:text-white transition-colors">新增靈感</span>
@@ -1256,9 +1515,8 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             </div>
         </div>
 
-
         {/* Filter Bar */}
-        <div className="px-6 mb-2 flex items-center justify-between z-10 relative opacity-80 text-[10px] font-black tracking-[0.3em] uppercase text-white shrink-0">
+        <div className="px-6 mb-2 flex items-center justify-between z-10 relative opacity-80 text-[10px] font-black tracking-[0.3em] uppercase text-white shrink-0 mt-2">
             <span>
               {viewMode === 'missions' ? 'STUDIO TASKS' : 'ROUTINE TASKS'} 
               {viewMode === 'missions' && <span className="text-purple-300 ml-1.5">{incompleteTasks.length}</span>}
@@ -1273,7 +1531,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             </div>
         </div>
 
-
         {/* Task List */}
         <div className="flex-1 px-4 space-y-3 pb-24 z-10 relative font-sans overflow-y-auto custom-scrollbar">
             {tasksToRender.length === 0 ? <div className="text-center py-24 opacity-30 text-purple-300 flex flex-col items-center justify-center gap-4"><ShellIcon size={60} strokeWidth={1} /><span className="text-xs tracking-widest uppercase font-bold">No Inspiration Found</span></div> :
@@ -1283,7 +1540,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
                 const isOverdue = t.deadline && t.deadline < toLocalYYYYMMDD(new Date());
                 const isRepeatView = viewMode === 'repeat';
                 const displayName = (isRepeatView && t.recurring) ? (t.templateName || t.name) : t.name;
-
 
                 return (
                     <div key={t.id} onClick={() => openEditModal(t)} className={`relative bg-gradient-to-br from-[#2e1065]/90 to-[#020617]/90 backdrop-blur-md p-4 rounded-2xl border transition-all cursor-pointer shadow-lg group active:scale-[0.98] overflow-hidden font-sans ${isRepeatView ? 'border-purple-500/20' : 'border-purple-500/10 hover:border-purple-500/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.2)'} ${isBursting ? 'burst-effect' : ''}`}>
@@ -1325,7 +1581,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             }
         </div>
 
-
         {/* Modals & Overlays */}
         <input type="file" ref={fileInputRef} onChange={onFileChange} className="hidden" accept="image/*"/>
         <input type="file" ref={fileImportRef} onChange={handleImportCSV} className="hidden" accept=".csv" />
@@ -1364,10 +1619,9 @@ const RafayelTodoTab = ({ user, appFrame }) => {
           appFrame
         )}
 
-
         {/* Chat Window */}
         {isChatOpen && appFrame && createPortal(
-          <div className="fixed inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="absolute inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
              <div className="flex-1 w-full max-w-md mx-auto bg-[#0f172a] h-full shadow-2xl flex flex-col relative overflow-hidden font-sans">
                 {/* Header */}
                 <div className="px-4 py-4 bg-[#1e1b4b]/90 backdrop-blur-md border-b border-purple-900/50 flex items-center justify-between z-10 shrink-0">
@@ -1412,7 +1666,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
                     </div>
                 )}
 
-
                 {/* Messages */}
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-[#0f0a20] to-[#1e1b4b] relative chat-scroll">
                     {chatMessages.map((msg) => (
@@ -1436,7 +1689,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
           appFrame
         )}
 
-
         {isCelebrationOpen && appFrame && createPortal(
             <div onClick={() => { if (canCloseCelebration) setIsCelebrationOpen(false); }} className="fixed inset-0 z-[250] flex flex-col items-center justify-center p-8 text-center font-sans overflow-hidden cursor-pointer" style={{ background: 'radial-gradient(circle at center, #312e81 0%, #000000 80%)' }}>
               <FireworksDisplay />
@@ -1452,7 +1704,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             </div>,
             appFrame
         )}
-
 
         {isCollectionOpen && appFrame && createPortal(
             <div className="fixed inset-0 z-[300] flex items-end justify-center bg-black/90 backdrop-blur-md font-sans text-left p-0">
@@ -1497,7 +1748,6 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             appFrame
         )}
 
-
         {isDeleteAllConfirmOpen && appFrame && createPortal(
           <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/95 backdrop-blur-md p-8 font-sans">
             <div className="w-full max-w-sm bg-[#0a0a0a] border border-pink-900/50 rounded-2xl p-10 text-center animate-in zoom-in-95 duration-300 shadow-[0_0_50px_rgba(236,72,153,0.1)] font-sans relative overflow-hidden">
@@ -1514,44 +1764,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
           appFrame
         )}
 
-
-        {editingTask && appFrame && createPortal(
-            <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 font-sans">
-                <div className="absolute inset-0" onClick={() => setEditingTask(null)}></div>
-                <div className="relative w-full max-w-sm bg-[#1e1b4b] border border-purple-800 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-wider"><EditIcon size={18} className="text-purple-500"/> 修改靈感</h3>
-                        <button onClick={() => setEditingTask(null)} className="p-2 bg-white/5 rounded text-slate-400 hover:text-white"><X size={20}/></button>
-                    </div>
-                    <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
-                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">內容</label>
-                        <textarea value={editName} onChange={(e) => setEditName(e.target.value)} rows={3} className="w-full bg-transparent text-sm font-bold text-white placeholder-slate-700 outline-none resize-none leading-relaxed"/>
-                    </div>
-                    {(viewMode !== 'repeat' || !editingTask.recurring) && (
-                      <>
-                        <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">完成日期 (Date)</label>
-                            <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full bg-transparent text-white font-bold outline-none [color-scheme:dark]" />
-                        </div>
-                        <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
-                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">鬧鐘 (Alarm)</label>
-                            <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="w-full bg-transparent text-white font-bold outline-none [color-scheme:dark]" />
-                        </div>
-                        <button type="button" onClick={addToGoogleCalendar} className="w-full p-3 mb-4 bg-[#4285F4]/20 border border-[#4285F4]/40 hover:bg-[#4285F4]/30 text-[#8ab4f8] rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 uppercase text-xs tracking-wider"><Calendar size={14} /> 加入 Google 日曆提醒 <ExternalLink size={12} /></button>
-                      </>
-                    )}
-
-
-                    <div className="flex gap-3">
-                        <button type="button" onClick={() => setTaskToDelete(editingTask)} className="p-3 bg-pink-950/20 text-pink-400 rounded-xl font-bold active:scale-95 flex-1 flex justify-center hover:bg-pink-950/40 border border-transparent hover:border-pink-900/50 transition-all cursor-pointer z-10"><Trash2 size={20}/></button>
-                        <button type="button" onClick={handleSaveEdit} className="flex-[3] py-3 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-black text-sm shadow-[0_0_15px_rgba(168,85,247,0.4)] active:scale-95 flex items-center justify-center gap-2 transition-all"><Save size={18}/> 保存修改</button>
-                    </div>
-                </div>
-            </div>,
-            appFrame
-        )}
-
-
+        {/* 編輯靈感 Modal */}
         {isModalOpen && appFrame && createPortal(
             <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm p-0 overflow-hidden font-sans">
                 <div className="absolute inset-0" onClick={resetForm}></div>
@@ -1573,7 +1786,7 @@ const RafayelTodoTab = ({ user, appFrame }) => {
                                     <textarea rows={4} placeholder="這次的靈感是什麼？" value={taskName} onChange={(e)=>setTaskName(e.target.value)} className="w-full p-6 bg-slate-900/50 border border-slate-800 rounded-xl focus:border-purple-500 focus:outline-none text-xl text-white placeholder:text-slate-600 resize-none font-bold shadow-inner font-sans tracking-wide custom-scrollbar" autoFocus />
                                     <div className="absolute right-4 bottom-4 text-purple-500/20"><BrushIcon size={20}/></div>
                                 </div>
-                                <button onClick={() => taskName.trim() ? setModalStep(2) : null} className="w-full py-5 bg-slate-100 text-black rounded-xl font-black text-xl shadow-xl active:scale-95 transition-all font-sans flex items-center justify-center gap-2 hover:bg-white">下一步 <ChevronLeft className="rotate-180" size={20}/></button>
+                                <button onClick={() => setModalStep(2)} className="w-full py-5 bg-slate-100 text-black rounded-xl font-black text-xl shadow-xl active:scale-95 transition-all font-sans flex items-center justify-center gap-2 hover:bg-white">下一步 <ChevronLeft className="rotate-180" size={20}/></button>
                             </div>
                         )}
                         {modalStep === 2 && (
@@ -1635,7 +1848,42 @@ const RafayelTodoTab = ({ user, appFrame }) => {
             </div>,
             appFrame
         )}
-        
+
+        {editingTask && appFrame && createPortal(
+            <div className="fixed inset-0 z-[350] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 font-sans">
+                <div className="absolute inset-0" onClick={() => setEditingTask(null)}></div>
+                <div className="relative w-full max-w-sm bg-[#1e1b4b] border border-purple-800 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-wider"><EditIcon size={18} className="text-purple-500"/> 修改靈感</h3>
+                        <button onClick={() => setEditingTask(null)} className="p-2 bg-white/5 rounded text-slate-400 hover:text-white"><X size={20}/></button>
+                    </div>
+                    <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1 block">內容</label>
+                        <textarea value={editName} onChange={(e) => setEditName(e.target.value)} rows={3} className="w-full bg-transparent text-sm font-bold text-white placeholder-slate-700 outline-none resize-none leading-relaxed"/>
+                    </div>
+                    {(viewMode !== 'repeat' || !editingTask.recurring) && (
+                      <>
+                        <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">完成日期 (Date)</label>
+                            <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full bg-transparent text-white font-bold outline-none [color-scheme:dark]" />
+                        </div>
+                        <div className="bg-black/50 rounded-xl p-3 mb-4 border border-slate-800 focus-within:border-purple-500/50 transition-colors">
+                            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">鬧鐘 (Alarm)</label>
+                            <input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} className="w-full bg-transparent text-white font-bold outline-none [color-scheme:dark]" />
+                        </div>
+                        <button type="button" onClick={addToGoogleCalendar} className="w-full p-3 mb-4 bg-[#4285F4]/20 border border-[#4285F4]/40 hover:bg-[#4285F4]/30 text-[#8ab4f8] rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 uppercase text-xs tracking-wider"><Calendar size={14} /> 加入 Google 日曆提醒 <ExternalLink size={12} /></button>
+                      </>
+                    )}
+
+                    <div className="flex gap-3">
+                        <button type="button" onClick={() => setTaskToDelete(editingTask)} className="p-3 bg-pink-950/20 text-pink-400 rounded-xl font-bold active:scale-95 flex-1 flex justify-center hover:bg-pink-950/40 border border-transparent hover:border-pink-900/50 transition-all cursor-pointer z-10"><Trash2 size={20}/></button>
+                        <button type="button" onClick={handleSaveEdit} className="flex-[3] py-3 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-black text-sm shadow-[0_0_15px_rgba(168,85,247,0.4)] active:scale-95 flex items-center justify-center gap-2 transition-all"><Save size={18}/> 保存修改</button>
+                    </div>
+                </div>
+            </div>,
+            appFrame
+        )}
+
         {isCropModalOpen && rawImage && appFrame && createPortal(
             <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/95 backdrop-blur-lg p-6 font-sans">
               <div className="w-full max-w-sm bg-[#1e1b4b] border border-purple-800 rounded-2xl p-8 flex flex-col items-center animate-in zoom-in-95 duration-300 shadow-2xl">
@@ -1671,100 +1919,129 @@ const RafayelTodoTab = ({ user, appFrame }) => {
   );
 }
 
-
 // ==========================================
-// Main App Component (Shell) - 強制驗證版
+// Main App Component (Shell)
 // ==========================================
 export default function App() {
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('planner'); 
+  const [activeTab, setActiveTab] = useState('planner'); // 'planner' | 'todo'
   const [loading, setLoading] = useState(true);
   const [appFrame, setAppFrame] = useState(null);
 
-  // 1. Google 登入函數
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      console.log("✅ Google 登入成功");
-    } catch (err) {
-      console.error("❌ Google 登入失敗:", err);
-    }
-  };
-
-  // 2. Google 登出函數
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      console.log("✅ 登出成功");
-    } catch (err) {
-      console.error("❌ 登出失敗:", err);
-    }
-  };
-
-   useEffect(() => {
+  useEffect(() => {
+    // 等待 DOM 渲染後取得容器
     setAppFrame(document.getElementById('rafayel-app-frame'));
+
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { console.error("Auth Fail:", err); }
+    };
+    initAuth();
     
-    // 只監聽狀態變化，如果沒有登入，就不要強迫去做匿名登入
     const unsubscribe = onAuthStateChanged(auth, (currUser) => {
-      if (currUser) {
-         setUser(currUser);
-      } else {
-         setUser(null); // 這會讓畫面自動跳轉到你寫好的「進入工作室」登入按鈕
-      }
+      setUser(currUser);
       setLoading(false);
     });
     return () => unsubscribe();
-}, []);
+  }, []);
 
   return (
-    <div id="rafayel-app-frame" className="w-screen h-screen bg-[#0f0a20] flex justify-center items-center font-sans overflow-hidden text-slate-200 selection:bg-purple-500/30 relative fixed inset-0">
+    <div id="rafayel-app-frame" className="w-full h-screen bg-gradient-to-br from-[#240078] to-[#C4529E] flex justify-center items-center font-sans overflow-hidden text-slate-200 selection:bg-purple-500/30 relative">
       <style>{`
         @import url('https://cdn.jsdelivr.net/gh/justfont/open-huninn-font@master/font/jf-openhuninn.css');
-        html, body { background-color: #0f0a20; overscroll-behavior-y: none; }
-        * { font-family: 'jf-openhuninn', sans-serif !important; }
+
+        * {
+           font-family: 'jf-openhuninn', sans-serif !important;
+        }
+
+        @keyframes bubble-rise { 0% { transform: translateY(110vh) scale(0.5); opacity: 0; } 50% { opacity: 0.8; } 100% { transform: translateY(-10vh) scale(1.2); opacity: 0; } }
+        @keyframes ember-float { 0% { transform: translateY(0) translateX(0) scale(1); opacity: 1; filter: hue-rotate(0deg); } 100% { transform: translateY(-100px) translateX(20px) scale(0); opacity: 0; filter: hue-rotate(90deg); } }
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes firework-burst { 0% { transform: scale(0); opacity: 1; } 50% { opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes spark-fly { 0% { stroke-dasharray: 0 30; stroke-dashoffset: 0; } 50% { stroke-dasharray: 30 30; stroke-dashoffset: 0; } 100% { stroke-dasharray: 0 30; stroke-dashoffset: -30; } }
+        @keyframes glow-pulse { 0%, 100% { box-shadow: 0 0 20px rgba(168,85,247,0.2), inset 0 0 10px rgba(168,85,247,0.1); border-color: rgba(192, 132, 252, 0.4); } 50% { box-shadow: 0 0 40px rgba(168,85,247,0.4), inset 0 0 20px rgba(168,85,247,0.2); border-color: rgba(192, 132, 252, 0.8); } }
+        @keyframes msg-pop { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes fire-burst { 0% { transform: scale(1); filter: brightness(1); opacity: 1; } 50% { filter: brightness(1.5) drop-shadow(0 0 15px #f43f5e); } 100% { transform: scale(1.3); filter: blur(4px) opacity(0); opacity: 0; } }
+
+        .msg-enter { animation: msg-pop 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+        .bubble-bg { position: absolute; bottom: -20px; color: #a78bfa; opacity: 0.3; pointer-events: none; z-index: 0; animation: bubble-rise linear infinite; }
+        .ember-bg { position: absolute; color: #fb7185; pointer-events: none; z-index: 5; animation: ember-float linear infinite; }
+        .celebration-bubble { position: absolute; color: #60a5fa; pointer-events: none; z-index: 260; animation: bubble-rise linear infinite; }
+        .celebration-ember { position: absolute; color: #f472b6; pointer-events: none; z-index: 260; animation: ember-float linear infinite; }
+        .animate-spin-slow { animation: spin 8s linear infinite; }
+        .burst-effect { animation: fire-burst 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards; pointer-events: none; border-color: #f43f5e !important; background: rgba(244, 63, 94, 0.2) !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.3); border-radius: 10px; }
+        .chat-scroll::-webkit-scrollbar { width: 4px; }
+        .chat-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+        
+        /* 日記牛皮紙材質 */
+        .kraft-paper {
+            background-color: #d7b586;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+            color: #3e2723;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.2);
+        }
       `}</style>
 
-      {loading ? (
-          <div className="text-purple-400 animate-pulse font-black tracking-widest">LOADING...</div>
-      ) : !user ? (
-          /* 未登入畫面：顯示登入框 */
-          <div className="relative z-10 w-full max-w-sm p-8 mx-4 rounded-[2rem] bg-[#0f172a]/80 border border-white/10 shadow-2xl text-center">
-            <h2 className="text-2xl font-black text-white tracking-widest mb-8">Mo Art Studio</h2>
+      {/* Background Effects (Shared) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {[...Array(15)].map((_, i) => (
+           <div key={`b-${i}`} className="bubble-bg" style={{ left: `${Math.random()*100}%`, animationDuration: `${Math.random()*10+10}s`, animationDelay: `${Math.random()*5}s` }}>
+              <div className="rounded-full border border-purple-400/30 bg-purple-500/10" style={{width: Math.random()*20+10, height: Math.random()*20+10}}></div>
+           </div>
+        ))}
+        {[...Array(25)].map((_, i) => (
+           <div key={`e-${i}`} className="ember-bg" style={{ left: `${Math.random()*100}%`, top: `${Math.random()*100 + 20}%`, animationDuration: `${Math.random()*4+2}s`, animationDelay: `${Math.random()*2}s`, width: Math.random() * 4 + 2, height: Math.random() * 4 + 2, borderRadius: '50%', background: '#fb7185', boxShadow: '0 0 10px #f43f5e' }} />
+        ))}
+      </div>
+
+      <div className="relative z-10 w-full max-w-md h-full sm:h-[95vh] sm:rounded-[2.5rem] bg-[#0f172a]/40 backdrop-blur-2xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden ring-1 ring-white/5 font-sans">
+        
+        {/* Browser-like Tab Bar */}
+        <div className="h-12 flex items-center bg-black/40 border-b border-white/5 px-2 gap-2 pt-2 shrink-0 z-50 backdrop-blur-md">
             <button 
-              type="button"
-              onClick={handleGoogleLogin}
-              className="w-full py-4 bg-gradient-to-r from-purple-700 to-pink-700 text-white rounded-xl font-black text-sm tracking-widest shadow-lg active:scale-95 transition-all outline-none"
+                onClick={() => setActiveTab('planner')} 
+                className={`flex-1 h-full rounded-t-xl flex items-center justify-center gap-2 text-xs font-black tracking-widest transition-all relative ${activeTab === 'planner' ? 'bg-[#2e1065]/60 text-white' : 'bg-transparent text-white/40 hover:text-white/70 hover:bg-white/5'}`}
             >
-              進入工作室 (Google 登入)
+                <Layout size={14} /> 行事曆 <span className="hidden sm:inline">PLANNER</span>
+                {activeTab === 'planner' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 shadow-[0_0_10px_#a855f7]"></div>}
             </button>
-          </div>
-      ) : (
-          /* 已登入畫面 */
-          <div className="relative z-10 w-full max-w-md h-full sm:h-[95vh] sm:rounded-[2.5rem] bg-[#0f172a]/40 backdrop-blur-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden">
-            <div className="h-12 flex items-center justify-between bg-black/40 border-b border-white/5 px-3 gap-2 pt-2 shrink-0">
-                <div className="flex gap-2 flex-1">
-                    <button onClick={() => setActiveTab('planner')} className={`flex-1 rounded-t-xl text-xs font-black ${activeTab === 'planner' ? 'bg-[#2e1065]/60 text-white' : 'text-white/40'}`}>行事曆</button>
-                    <button onClick={() => setActiveTab('todo')} className={`flex-1 rounded-t-xl text-xs font-black ${activeTab === 'todo' ? 'bg-[#2e1065]/60 text-white' : 'text-white/40'}`}>靈感集</button>
+            <button 
+                onClick={() => setActiveTab('todo')} 
+                className={`flex-1 h-full rounded-t-xl flex items-center justify-center gap-2 text-xs font-black tracking-widest transition-all relative ${activeTab === 'todo' ? 'bg-[#2e1065]/60 text-white' : 'bg-transparent text-white/40 hover:text-white/70 hover:bg-white/5'}`}
+            >
+                <ListTodoIcon size={14} /> 靈感集 <span className="hidden sm:inline">CANVAS</span>
+                {activeTab === 'todo' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 shadow-[0_0_10px_#a855f7]"></div>}
+            </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden relative">
+            {loading ? (
+                <div className="h-full flex flex-col items-center justify-center text-purple-200">
+                    <div className="animate-spin-slow mb-4"><ShellIcon size={32} /></div>
+                    <span className="text-xs font-bold tracking-widest uppercase animate-pulse">Syncing with Lemuria...</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-white/50 font-mono truncate max-w-[100px]">{user?.email}</span>
-                    <button onClick={handleLogout} className="text-xs font-black px-2 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 transition-colors" title="登出">
-                        <User size={14} />
-                    </button>
-                </div>
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-                <div className={`absolute inset-0 ${activeTab === 'planner' ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <RafayelPlannerTab user={user} appFrame={appFrame} />
-                </div>
-                <div className={`absolute inset-0 ${activeTab === 'todo' ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <RafayelTodoTab user={user} appFrame={appFrame} />
-                </div>
-            </div>
-          </div>
-      )}
+            ) : (
+                <>
+                    <div className={`absolute inset-0 transition-opacity duration-300 ${activeTab === 'planner' ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}>
+                        <RafayelPlannerTab user={user} appFrame={appFrame} />
+                    </div>
+                    <div className={`absolute inset-0 transition-opacity duration-300 ${activeTab === 'todo' ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}>
+                        <RafayelTodoTab user={user} appFrame={appFrame} />
+                    </div>
+                </>
+            )}
+        </div>
+      </div>
     </div>
   );
 }

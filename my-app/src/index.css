@@ -2,35 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Ensure no white gaps on scroll and consistent background */
-html, body, #root {
-	height: 100vh;
+/* Global setup: Deep background, no white edges */
+html, body {
 	margin: 0;
 	padding: 0;
-}
-
-html {
-	background: linear-gradient(to bottom right, #240078, #C4529E);
-	background-attachment: fixed;
+	width: 100%;
+	height: 100%;
+	background-color: #0f0a20;
+	overflow-x: hidden;
+	overflow-y: hidden;
+	overscroll-behavior-y: none;
+	overscroll-behavior-x: none;
 }
 
 body {
-	@apply m-0 min-h-screen text-slate-900 antialiased;
-	background: transparent;
+	@apply text-slate-900 antialiased;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
-	overflow: hidden;
 }
 
 #root {
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
+}
+
+/* Custom scrollbar styling with no white edges */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-/* prevent horizontal scroll white gaps */
-body, #root {
-	overflow-x: hidden;
-	overflow-y: hidden;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background: rgba(168, 85, 247, 0.3);
+	border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: rgba(168, 85, 247, 0.5);
 }
