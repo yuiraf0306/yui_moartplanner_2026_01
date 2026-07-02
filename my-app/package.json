@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:github": "tsc -b && VITE_BASE=/yui_moartplanner_2026_01/yui_moartplanner_2026_1.1/ vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
